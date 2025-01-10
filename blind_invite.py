@@ -45,9 +45,11 @@ def main():
         if task_search:
             tasks = search_tasks_in_close(task_search, close_api_key)
             if tasks:
-                st.write(f"Found {len(tasks)} tasks:")
+                st.write(
+                    f"Found {len(tasks)} lead(s) that have that task description to be completed:"
+                )
                 for task in tasks:
-                    st.write(f"- {task['text']}")
+                    st.write(f"- {task['lead_name']}")
             else:
                 st.write("No tasks found.")
         else:
