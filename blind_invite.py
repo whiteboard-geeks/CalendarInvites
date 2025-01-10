@@ -50,6 +50,22 @@ def main():
                 )
                 for task in tasks:
                     st.write(f"- {task['lead_name']}")
+
+                # Show meeting length and leads per block inputs after tasks are found
+                meeting_length = st.selectbox(
+                    "Select meeting length:",
+                    options=[10, 15, 20, 25, 30],
+                    index=1,  # Default to 15 minutes
+                )
+
+                leads_per_block = st.number_input(
+                    "Enter number of leads per block:",
+                    min_value=1,
+                    value=6,  # Default to 6 leads per block
+                )
+
+                st.write(f"Meeting length: {meeting_length} minutes")
+                st.write(f"Leads per block: {leads_per_block}")
             else:
                 st.write("No tasks found.")
         else:
