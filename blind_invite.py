@@ -1,21 +1,34 @@
 import streamlit as st
 import requests
+import base64
 
 
 # Function to search tasks in Close CRM
-def search_tasks_in_close(task_search, api_key):
+def search_tasks_in_close(task_search, close_api_key):
+    # Encode the API key using Base64
+    encoded_api_key = base64.b64encode(f"{close_api_key}:".encode()).decode()
+
     url = "https://api.close.com/api/v1/task/"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Basic {encoded_api_key}",  # Use Basic auth with encoded key
+        "Content-Type": "application/json",
+    }
     params = {
         "_type": "lead",  # Assuming you want to search lead tasks
-        "text__icontains": task_search,  # Filter tasks containing the search string
+        "is_complete": False,
+        "view": "inbox",
     }
     response = requests.get(url, headers=headers, params=params)
 
     if response.status_code == 200:
-        return response.json().get("data", [])
+        tasks = response.json().get("data", [])
+        # Filter tasks based on the task_search string
+        filtered_tasks = [
+            task for task in tasks if task_search.lower() in task["text"].lower()
+        ]
+        return filtered_tasks
     else:
-        st.error("Failed to fetch tasks from Close CRM")
+        st.error("Task fetch failed")
         return []
 
 
@@ -25,12 +38,12 @@ def main():
     # Step 1: User input for task search
     task_search = st.text_input("Enter task search string:")
 
-    # Retrieve the API key from Streamlit secrets
-    api_key = st.secrets["close_api_key"]
+    # Retrieve the Close API key from Streamlit secrets
+    close_api_key = st.secrets["CLOSE_API_KEY"]
 
     if st.button("Search Tasks"):
         if task_search:
-            tasks = search_tasks_in_close(task_search, api_key)
+            tasks = search_tasks_in_close(task_search, close_api_key)
             if tasks:
                 st.write(f"Found {len(tasks)} tasks:")
                 for task in tasks:
