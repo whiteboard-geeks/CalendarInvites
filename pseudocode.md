@@ -59,3 +59,5 @@ def main():
 # Run the app
 if __name__ == "__main__":
     main()
+
+# TODO: add streamlit url to secrets.toml for Google Calendar API
