@@ -36,51 +36,63 @@ def search_tasks_in_close(task_search, close_api_key):
 def main():
     st.title("Automated Calendar Invites")
 
+    # Initialize session state for tasks and options
+    if "tasks" not in st.session_state:
+        st.session_state.tasks = []
+    if "meeting_length" not in st.session_state:
+        st.session_state.meeting_length = 15
+    if "leads_per_block" not in st.session_state:
+        st.session_state.leads_per_block = 6
+
+    # Initialize session state for search attempt
+    if "search_attempted" not in st.session_state:
+        st.session_state.search_attempted = False
+
     # Step 1: User input for task search
     task_search = st.text_input("Enter task search string:")
 
     # Retrieve the Close API key from Streamlit secrets
     close_api_key = st.secrets["CLOSE_API_KEY"]
 
-    if st.button("Search Tasks"):
-        if task_search:
-            tasks = search_tasks_in_close(task_search, close_api_key)
-            if tasks:
-                st.write(
-                    f"Found {len(tasks)} lead(s) that have that task description to be completed:"
-                )
-                for task in tasks:
-                    st.write(f"- {task['lead_name']}")
+    if st.button("Search Tasks") and task_search:
+        with st.spinner("Searching for tasks..."):
+            st.session_state.tasks = search_tasks_in_close(task_search, close_api_key)
+            st.session_state.search_attempted = True
 
-                # Show meeting length and leads per block inputs after tasks are found
-                meeting_length = st.selectbox(
-                    "Select meeting length:",
-                    options=[10, 15, 20, 25, 30],
-                    index=1,  # Default to 15 minutes
-                )
+    if st.session_state.search_attempted:
+        if st.session_state.tasks:
+            st.write(
+                f"Found {len(st.session_state.tasks)} lead(s) that have that task description to be completed:"
+            )
+            for task in st.session_state.tasks:
+                st.write(f"- {task['lead_name']}")
 
-                leads_per_block = st.number_input(
-                    "Enter number of leads per block:",
-                    min_value=1,
-                    value=6,  # Default to 6 leads per block
-                )
+            # Show meeting length and leads per block inputs after tasks are found
+            st.session_state.meeting_length = st.selectbox(
+                "Select meeting length:",
+                options=[10, 15, 20, 25, 30],
+                index=[10, 15, 20, 25, 30].index(st.session_state.meeting_length),
+            )
 
-                st.write(f"Meeting length: {meeting_length} minutes")
-                st.write(f"Leads per block: {leads_per_block}")
-            else:
-                st.write("No tasks found.")
+            st.session_state.leads_per_block = st.number_input(
+                "Enter number of leads per block:",
+                min_value=1,
+                value=st.session_state.leads_per_block,
+            )
+
+            if st.button("Find Blind Invite Slots"):
+                events = calendar_utils.find_blind_invite_events()
+                if events:
+                    st.write("Available 'Blind Invite' slots:")
+                    for event in events:
+                        start = event["start"].get(
+                            "dateTime", event["start"].get("date")
+                        )
+                        st.write(f"- {event['summary']} at {start}")
+                else:
+                    st.write("No 'Blind Invite' slots found.")
         else:
-            st.warning("Please enter a task search string.")
-
-    if st.button("Find Blind Invite Slots"):
-        events = calendar_utils.find_blind_invite_events()
-        if events:
-            st.write("Available 'Blind Invite' slots:")
-            for event in events:
-                start = event["start"].get("dateTime", event["start"].get("date"))
-                st.write(f"- {event['summary']} at {start}")
-        else:
-            st.write("No 'Blind Invite' slots found.")
+            st.write("No tasks found.")
 
 
 # Run the app
