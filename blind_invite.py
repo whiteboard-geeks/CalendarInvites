@@ -168,8 +168,10 @@ def main():
                                 st.write(
                                     f"Created invite for task: {task['text']} from {start_dt} to {end_dt}"
                                 )
-                                start_dt = end_dt
                                 task_index += 1
+
+                            # Move start time to the next block
+                            start_dt = end_dt
                     else:
                         st.write("No available slots to create invites.")
         else:
