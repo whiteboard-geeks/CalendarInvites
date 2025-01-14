@@ -11,7 +11,7 @@ from googleapiclient.errors import HttpError
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
-def find_blind_invite_events():
+def find_blind_invite_events(query="Blind Invite"):
     """Shows basic usage of the Google Calendar API.
     Prints the start and name of the next 10 events on the user's calendar.
     """
@@ -47,7 +47,7 @@ def find_blind_invite_events():
                 maxResults=10,
                 singleEvents=True,
                 orderBy="startTime",
-                q="Blind Invite",
+                q=query,
             )
             .execute()
         )

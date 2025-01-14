@@ -80,17 +80,22 @@ def main():
                 value=st.session_state.leads_per_block,
             )
 
-            if st.button("Find Blind Invite Slots"):
-                events = calendar_utils.find_blind_invite_events()
+            # Add a text input for placeholder event name
+            placeholder_event_name = st.text_input(
+                "Placeholder event name:", "Blind invite"
+            )
+
+            if st.button("Find Placeholder Slots"):
+                events = calendar_utils.find_blind_invite_events(placeholder_event_name)
                 if events:
-                    st.write("Available 'Blind Invite' slots:")
+                    st.write("Available 'Placeholder' slots:")
                     for event in events:
                         start = event["start"].get(
                             "dateTime", event["start"].get("date")
                         )
                         st.write(f"- {event['summary']} at {start}")
                 else:
-                    st.write("No 'Blind Invite' slots found.")
+                    st.write("No 'Placeholder' slots found.")
         else:
             st.write("No tasks found.")
 
