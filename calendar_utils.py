@@ -47,6 +47,7 @@ def find_blind_invite_events():
                 maxResults=10,
                 singleEvents=True,
                 orderBy="startTime",
+                q="Blind Invite",
             )
             .execute()
         )
