@@ -42,7 +42,7 @@ def find_blind_invite_events():
         events_result = (
             service.events()
             .list(
-                calendarId="primary",
+                calendarId="lance@whiteboardgeeks.com",
                 timeMin=now,
                 maxResults=10,
                 singleEvents=True,
