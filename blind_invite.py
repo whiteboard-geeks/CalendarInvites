@@ -144,18 +144,21 @@ def main():
                 ):
                     st.session_state.create_invites_clicked = True
                     if st.session_state.placeholder_events:
+                        task_index = 0
                         for placeholder_event in st.session_state.placeholder_events:
+                            if task_index >= len(st.session_state.tasks):
+                                break
+
                             start = placeholder_event["start"].get(
                                 "dateTime", placeholder_event["start"].get("date")
                             )
                             start_dt = datetime.datetime.fromisoformat(start)
 
-                            for i, task in enumerate(st.session_state.tasks):
-                                if i % st.session_state.leads_per_block == 0 and i != 0:
-                                    start_dt += datetime.timedelta(
-                                        minutes=st.session_state.meeting_length
-                                    )
+                            for _ in range(st.session_state.leads_per_block):
+                                if task_index >= len(st.session_state.tasks):
+                                    break
 
+                                task = st.session_state.tasks[task_index]
                                 end_dt = start_dt + datetime.timedelta(
                                     minutes=st.session_state.meeting_length
                                 )
@@ -165,6 +168,8 @@ def main():
                                 st.write(
                                     f"Created invite for task: {task['text']} from {start_dt} to {end_dt}"
                                 )
+                                start_dt = end_dt
+                                task_index += 1
                     else:
                         st.write("No available slots to create invites.")
         else:
