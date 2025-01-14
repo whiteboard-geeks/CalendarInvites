@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import base64
 import calendar_utils
+import datetime
 
 
 # Function to search tasks in Close CRM
@@ -88,12 +89,43 @@ def main():
             if st.button("Find Placeholder Slots"):
                 events = calendar_utils.find_blind_invite_events(placeholder_event_name)
                 if events:
-                    st.write("Available 'Placeholder' slots:")
+                    # Check each event duration
+                    insufficient_blocks = []
+                    total_event_time = 0
                     for event in events:
                         start = event["start"].get(
                             "dateTime", event["start"].get("date")
                         )
-                        st.write(f"- {event['summary']} at {start}")
+                        end = event["end"].get("dateTime", event["end"].get("date"))
+                        start_dt = datetime.datetime.fromisoformat(start)
+                        end_dt = datetime.datetime.fromisoformat(end)
+                        duration = (
+                            end_dt - start_dt
+                        ).total_seconds() / 60  # duration in minutes
+                        total_event_time += duration
+
+                        if duration < st.session_state.meeting_length:
+                            insufficient_blocks.append(event)
+
+                    if insufficient_blocks:
+                        st.write("The following blocks are not long enough:")
+                        for block in insufficient_blocks:
+                            st.write(
+                                f"- {block['summary']} from {block['start']} to {block['end']}"
+                            )
+                        st.write("Please update these blocks and re-run.")
+                    else:
+                        # Check total event time
+                        required_time = (
+                            len(st.session_state.tasks)
+                            * st.session_state.meeting_length
+                        ) / st.session_state.leads_per_block
+                        if total_event_time < required_time:
+                            st.write(
+                                "You need to add more time to accommodate all tasks."
+                            )
+                        else:
+                            st.write("✅ Time looks good")
                 else:
                     st.write("No 'Placeholder' slots found.")
         else:
