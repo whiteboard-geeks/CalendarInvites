@@ -87,12 +87,14 @@ def main():
             )
 
             if st.button("Find Placeholder Slots"):
-                events = calendar_utils.find_blind_invite_events(placeholder_event_name)
-                if events:
+                placeholder_events = calendar_utils.find_placeholder_events(
+                    placeholder_event_name
+                )
+                if placeholder_events:
                     # Check each event duration
                     insufficient_blocks = []
                     total_event_time = 0
-                    for event in events:
+                    for event in placeholder_events:
                         start = event["start"].get(
                             "dateTime", event["start"].get("date")
                         )
@@ -126,8 +128,45 @@ def main():
                             )
                         else:
                             st.write("✅ Time looks good")
+                            st.session_state.time_looks_good = True
+                            st.session_state.placeholder_events = placeholder_events
                 else:
                     st.write("No 'Placeholder' slots found.")
+
+            # Ensure the 'Create Invites' button remains visible after being clicked
+            if "create_invites_clicked" not in st.session_state:
+                st.session_state.create_invites_clicked = False
+
+            if st.session_state.get("time_looks_good", False):
+                if (
+                    st.button("Create Invites")
+                    or st.session_state.create_invites_clicked
+                ):
+                    st.session_state.create_invites_clicked = True
+                    if st.session_state.placeholder_events:
+                        for placeholder_event in st.session_state.placeholder_events:
+                            start = placeholder_event["start"].get(
+                                "dateTime", placeholder_event["start"].get("date")
+                            )
+                            start_dt = datetime.datetime.fromisoformat(start)
+
+                            for i, task in enumerate(st.session_state.tasks):
+                                if i % st.session_state.leads_per_block == 0 and i != 0:
+                                    start_dt += datetime.timedelta(
+                                        minutes=st.session_state.meeting_length
+                                    )
+
+                                end_dt = start_dt + datetime.timedelta(
+                                    minutes=st.session_state.meeting_length
+                                )
+                                calendar_utils.create_calendar_invite(
+                                    task, start_dt.isoformat(), end_dt.isoformat()
+                                )
+                                st.write(
+                                    f"Created invite for task: {task['text']} from {start_dt} to {end_dt}"
+                                )
+                    else:
+                        st.write("No available slots to create invites.")
         else:
             st.write("No tasks found.")
 

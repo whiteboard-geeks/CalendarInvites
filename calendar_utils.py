@@ -8,32 +8,32 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+CALENDAR_ID = "lance@whiteboardgeeks.com"
 
 
-def find_blind_invite_events(query="Blind Invite"):
-    """Shows basic usage of the Google Calendar API.
-    Prints the start and name of the next 10 events on the user's calendar.
-    """
+def get_calendar_service():
+    """Returns an authorized Google Calendar API service instance."""
     creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
         with open("token.json", "w") as token:
             token.write(creds.to_json())
+    return build("calendar", "v3", credentials=creds)
 
+
+def find_placeholder_events(query="Blind Invite"):
+    """Shows basic usage of the Google Calendar API.
+    Prints the start and name of the next 10 events on the user's calendar.
+    """
     try:
-        service = build("calendar", "v3", credentials=creds)
+        service = get_calendar_service()
 
         # Call the Calendar API
         now = datetime.datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
@@ -62,5 +62,42 @@ def find_blind_invite_events(query="Blind Invite"):
         print(f"An error occurred: {error}")
 
 
+def create_calendar_invite(task, start_time, end_time):
+    """Creates a calendar invite for a given task."""
+    try:
+        service = get_calendar_service()
+
+        event = {
+            "summary": "Test event",
+            "description": f"Task from Close CRM: {task['text']}",
+            "start": {
+                "dateTime": start_time,
+                "timeZone": "UTC",
+            },
+            "end": {
+                "dateTime": end_time,
+                "timeZone": "UTC",
+            },
+            "attendees": [
+                {"email": "lance@servantrealestate.com"},
+            ],
+        }
+
+        event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        return event
+
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+
+
 if __name__ == "__main__":
-    find_blind_invite_events()
+    # Find placeholder events
+    events = find_placeholder_events()
+    print("Found events:", events)
+
+    # Create a sample event
+    task = {"text": "Sample Task"}
+    start_time = "2025-01-15T10:00:00Z"
+    end_time = "2025-01-15T11:00:00Z"
+    created_event = create_calendar_invite(task, start_time, end_time)
+    print("Created event:", created_event)
