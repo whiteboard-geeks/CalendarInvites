@@ -36,9 +36,8 @@ def find_blind_invite_events():
         service = build("calendar", "v3", credentials=creds)
 
         # Call the Calendar API
-        now = (
-            datetime.datetime.now(datetime.UTC).isoformat() + "Z"
-        )  # 'Z' indicates UTC time
+        now = datetime.datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
+
         print("Getting the upcoming 10 events")
         events_result = (
             service.events()
