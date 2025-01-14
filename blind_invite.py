@@ -152,26 +152,42 @@ def main():
                             start = placeholder_event["start"].get(
                                 "dateTime", placeholder_event["start"].get("date")
                             )
+                            end = placeholder_event["end"].get(
+                                "dateTime", placeholder_event["end"].get("date")
+                            )
                             start_dt = datetime.datetime.fromisoformat(start)
+                            end_dt = datetime.datetime.fromisoformat(end)
 
-                            for _ in range(st.session_state.leads_per_block):
+                            block_duration = (end_dt - start_dt).total_seconds() / 60
+                            meetings_per_block = int(
+                                block_duration // st.session_state.meeting_length
+                            )
+
+                            for _ in range(meetings_per_block):
                                 if task_index >= len(st.session_state.tasks):
                                     break
 
-                                task = st.session_state.tasks[task_index]
-                                end_dt = start_dt + datetime.timedelta(
+                                for _ in range(st.session_state.leads_per_block):
+                                    if task_index >= len(st.session_state.tasks):
+                                        break
+
+                                    task = st.session_state.tasks[task_index]
+                                    meeting_end_dt = start_dt + datetime.timedelta(
+                                        minutes=st.session_state.meeting_length
+                                    )
+                                    calendar_utils.create_calendar_invite(
+                                        task,
+                                        start_dt.isoformat(),
+                                        meeting_end_dt.isoformat(),
+                                    )
+                                    st.write(
+                                        f"Created invite for task: {task['text']} from {start_dt} to {meeting_end_dt}"
+                                    )
+                                    task_index += 1
+
+                                start_dt += datetime.timedelta(
                                     minutes=st.session_state.meeting_length
                                 )
-                                calendar_utils.create_calendar_invite(
-                                    task, start_dt.isoformat(), end_dt.isoformat()
-                                )
-                                st.write(
-                                    f"Created invite for task: {task['text']} from {start_dt} to {end_dt}"
-                                )
-                                task_index += 1
-
-                            # Move start time to the next block
-                            start_dt = end_dt
                     else:
                         st.write("No available slots to create invites.")
         else:
