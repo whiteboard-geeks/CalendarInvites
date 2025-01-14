@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import base64
+import calendar_utils
 
 
 # Function to search tasks in Close CRM
@@ -70,6 +71,16 @@ def main():
                 st.write("No tasks found.")
         else:
             st.warning("Please enter a task search string.")
+
+    if st.button("Find Blind Invite Slots"):
+        events = calendar_utils.find_blind_invite_events()
+        if events:
+            st.write("Available 'Blind Invite' slots:")
+            for event in events:
+                start = event["start"].get("dateTime", event["start"].get("date"))
+                st.write(f"- {event['summary']} at {start}")
+        else:
+            st.write("No 'Blind Invite' slots found.")
 
 
 # Run the app
