@@ -34,6 +34,22 @@ def search_tasks_in_close(task_search, close_api_key):
         return []
 
 
+def mark_task_complete_in_close(task_id, close_api_key):
+    """Marks a task as complete in Close CRM."""
+    encoded_api_key = base64.b64encode(f"{close_api_key}:".encode()).decode()
+    url = f"https://api.close.com/api/v1/task/{task_id}/"
+    headers = {
+        "Authorization": f"Basic {encoded_api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    data = {"is_complete": True}
+    response = requests.put(url, headers=headers, json=data)
+    if response.status_code != 200:
+        raise ValueError(f"Failed to mark task as complete: {response.text}")
+    return response.json()
+
+
 def split_contact_name(full_name):
     name_parts = full_name.split()
     if len(name_parts) == 1:
@@ -406,7 +422,18 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                     title_template=st.session_state.current_title,
                                     description_template=st.session_state.current_description,
                                 )
-                                st.success(f"Invite sent to {task['contact_name']}")
+                                # Mark the task as complete in Close CRM
+                                try:
+                                    mark_task_complete_in_close(
+                                        task["id"], close_api_key
+                                    )
+                                    st.success(
+                                        f"Invite sent to {task['contact_name']} and task marked as complete"
+                                    )
+                                except ValueError as e:
+                                    st.warning(
+                                        f"Invite sent but failed to mark task as complete: {str(e)}"
+                                    )
                                 break
 
                             # Move to next task
