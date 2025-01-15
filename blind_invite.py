@@ -323,64 +323,60 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                             st.session_state.time_looks_good = True
                             st.session_state.placeholder_events = placeholder_events
 
-                            # Add template fields for event customization only after time slots are found and valid
-                            st.subheader("Event Customization")
-                            title_input = st.text_input(
-                                "Event Title Template:",
-                                value=st.session_state.template_title,
-                                help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
-                                key="event_title_template",
-                            )
-                            if title_input != st.session_state.template_title:
-                                st.session_state.template_title = title_input
-
-                            description_input = st.text_area(
-                                "Event Description Template:",
-                                value=st.session_state.template_description,
-                                help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
-                                key="event_description_template",
-                            )
-                            if (
-                                description_input
-                                != st.session_state.template_description
-                            ):
-                                st.session_state.template_description = (
-                                    description_input
-                                )
-
-                            # Show example of template output with first task's data
-                            if st.session_state.tasks:
-                                first_task = st.session_state.tasks[0]
-                                st.subheader("Preview with first task's data:")
-                                st.write(
-                                    "Contact:",
-                                    first_task["contact_firstname"],
-                                    first_task["contact_lastname"],
-                                )
-                                st.write("Company:", first_task["company_name"])
-
-                                example_title = calendar_utils.format_template(
-                                    st.session_state.template_title, first_task
-                                )
-                                example_desc = calendar_utils.format_template(
-                                    st.session_state.template_description,
-                                    first_task,
-                                )
-
-                                st.write(
-                                    "Your event title will look like:", example_title
-                                )
-                                st.write(
-                                    "Your description will look like:", example_desc
-                                )
                 else:
                     st.write("No 'Placeholder' slots found.")
 
-            # Ensure the 'Create Invites' button remains visible after being clicked
-            if "create_invites_clicked" not in st.session_state:
-                st.session_state.create_invites_clicked = False
-
             if st.session_state.get("time_looks_good", False):
+                # Add template fields for event customization
+                st.subheader("Event Customization")
+                title_input = st.text_input(
+                    "Event Title Template:",
+                    value=st.session_state.template_title,
+                    help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
+                    key="event_title_template",
+                )
+                if title_input != st.session_state.template_title:
+                    st.session_state.template_title = title_input
+                    # Reset review mode if template is modified
+                    st.session_state.review_mode = False
+
+                description_input = st.text_area(
+                    "Event Description Template:",
+                    value=st.session_state.template_description,
+                    help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
+                    key="event_description_template",
+                )
+                if description_input != st.session_state.template_description:
+                    st.session_state.template_description = description_input
+                    # Reset review mode if template is modified
+                    st.session_state.review_mode = False
+
+                # Show example of template output with first task's data
+                if st.session_state.tasks:
+                    first_task = st.session_state.tasks[0]
+                    st.subheader("Preview with first task's data:")
+                    st.write(
+                        "Contact:",
+                        first_task["contact_firstname"],
+                        first_task["contact_lastname"],
+                    )
+                    st.write("Company:", first_task["company_name"])
+
+                    example_title = calendar_utils.format_template(
+                        st.session_state.template_title, first_task
+                    )
+                    example_desc = calendar_utils.format_template(
+                        st.session_state.template_description,
+                        first_task,
+                    )
+
+                    st.write("Your event title will look like:", example_title)
+                    st.write("Your description will look like:", example_desc)
+
+                # Ensure the 'Create Invites' button remains visible after being clicked
+                if "create_invites_clicked" not in st.session_state:
+                    st.session_state.create_invites_clicked = False
+
                 if not st.session_state.review_mode and st.button("Review Invites"):
                     st.session_state.review_mode = True
                     st.session_state.current_task_index = 0
@@ -446,29 +442,43 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                     st.success(
                                         f"Invite sent to {task['contact_name']} and task marked as complete"
                                     )
+                                    # Remove the completed task from session state
+                                    st.session_state.tasks = [
+                                        t
+                                        for t in st.session_state.tasks
+                                        if t["id"] != task["id"]
+                                    ]
                                 except ValueError as e:
                                     st.warning(
                                         f"Invite sent but failed to mark task as complete: {str(e)}"
                                     )
                                 break
 
-                            # Move to next task
-                            st.session_state.current_task_index += 1
-                            if st.session_state.current_task_index < total_tasks:
-                                next_task = st.session_state.tasks[
-                                    st.session_state.current_task_index
-                                ]
-                                st.session_state.current_title = (
-                                    calendar_utils.format_template(
-                                        st.session_state.template_title, next_task
-                                    )
+                            # Move to next task if there are any remaining
+                            if st.session_state.tasks:
+                                st.session_state.current_task_index = min(
+                                    st.session_state.current_task_index,
+                                    len(st.session_state.tasks) - 1,
                                 )
-                                st.session_state.current_description = (
-                                    calendar_utils.format_template(
-                                        st.session_state.template_description,
-                                        next_task,
+                                if (
+                                    st.session_state.tasks
+                                ):  # Double check in case list is now empty
+                                    next_task = st.session_state.tasks[
+                                        st.session_state.current_task_index
+                                    ]
+                                    st.session_state.current_title = (
+                                        calendar_utils.format_template(
+                                            st.session_state.template_title, next_task
+                                        )
                                     )
-                                )
+                                    st.session_state.current_description = (
+                                        calendar_utils.format_template(
+                                            st.session_state.template_description,
+                                            next_task,
+                                        )
+                                    )
+                                else:
+                                    st.session_state.review_mode = False
                             else:
                                 st.session_state.review_mode = False
                             st.rerun()
