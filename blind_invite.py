@@ -101,7 +101,8 @@ def append_lead_info_to_tasks(tasks, close_api_key):
 
 
 def main():
-    st.title("Automated Calendar Invites")
+    st.set_page_config(page_title="Auto Calendar Invites")
+    st.title("Auto Calendar Invites")
 
     # Default event description template
     event_description_default = """Hi {{first_name}},
