@@ -73,18 +73,49 @@ def main():
                 "Select meeting length:",
                 options=[10, 15, 20, 25, 30],
                 index=[10, 15, 20, 25, 30].index(st.session_state.meeting_length),
+                key="meeting_length_select",
             )
+
+            # Reset flags if meeting length changed
+            if "prev_meeting_length" not in st.session_state:
+                st.session_state.prev_meeting_length = st.session_state.meeting_length
+            elif (
+                st.session_state.prev_meeting_length != st.session_state.meeting_length
+            ):
+                st.session_state.time_looks_good = False
+                st.session_state.create_invites_clicked = False
+                st.session_state.prev_meeting_length = st.session_state.meeting_length
 
             st.session_state.leads_per_block = st.number_input(
                 "Enter number of leads per block:",
                 min_value=1,
                 value=st.session_state.leads_per_block,
+                key="leads_per_block_input",
             )
+
+            # Reset flags if leads per block changed
+            if "prev_leads_per_block" not in st.session_state:
+                st.session_state.prev_leads_per_block = st.session_state.leads_per_block
+            elif (
+                st.session_state.prev_leads_per_block
+                != st.session_state.leads_per_block
+            ):
+                st.session_state.time_looks_good = False
+                st.session_state.create_invites_clicked = False
+                st.session_state.prev_leads_per_block = st.session_state.leads_per_block
 
             # Add a text input for placeholder event name
             placeholder_event_name = st.text_input(
-                "Placeholder event name:", "Blind invite"
+                "Placeholder event name:", "Blind invite", key="placeholder_name_input"
             )
+
+            # Reset flags if placeholder name changed
+            if "prev_placeholder_name" not in st.session_state:
+                st.session_state.prev_placeholder_name = placeholder_event_name
+            elif st.session_state.prev_placeholder_name != placeholder_event_name:
+                st.session_state.time_looks_good = False
+                st.session_state.create_invites_clicked = False
+                st.session_state.prev_placeholder_name = placeholder_event_name
 
             if st.button("Find Placeholder Slots"):
                 placeholder_events = calendar_utils.find_placeholder_events(
