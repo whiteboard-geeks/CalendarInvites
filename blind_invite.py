@@ -87,6 +87,64 @@ def append_lead_info_to_tasks(tasks, close_api_key):
 def main():
     st.title("Automated Calendar Invites")
 
+    # Default event description template
+    event_description_default = """Hi {{first_name}},
+
+I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for medical companies. Not terribly long ago I sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
+
+I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Medtronic, Eli Lilly, and Cleveland Clinic. 
+
+If this time doesn't work for you please feel free to propose one that does. Whatever is convenient.
+
+Agenda:
+- Share science behind the Whiteboard Geeks success stories, benchmarking data, and observed industry trends
+- Learn about your current objectives and challenges
+- Get feedback on the usefulness of Whiteboard Geeks services for your organization
+- Plus we'll unlock the vault and show you videos related to your specific challenge-because videos are fun 😊🎥⭐
+
+As a bonus: I'll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
+
+Zoom Call information:
+Barbara Pigg is inviting you to a scheduled Zoom meeting.
+
+Topic: Barbara Pigg's Personal Meeting Room
+
+Join Zoom Meeting
+https://us02web.zoom.us/j/4960127137
+
+Meeting ID: 496 012 7137
+
+---
+
+One tap mobile
++16469313860,,4960127137# US
++13017158592,,4960127137# US (Washington DC)
+
+---
+
+Dial by your location
+• +1 646 931 3860 US
+• +1 301 715 8592 US (Washington DC)
+• +1 305 224 1968 US
+• +1 309 205 3325 US
+• +1 312 626 6799 US (Chicago)
+• +1 646 558 8656 US (New York)
+• +1 346 248 7799 US (Houston)
+• +1 360 209 5623 US
+• +1 386 347 5053 US
+• +1 507 473 4847 US
+• +1 564 217 2000 US
+• +1 669 444 9171 US
+• +1 669 900 9128 US (San Jose)
+• +1 689 278 1000 US
+• +1 719 359 4580 US
+• +1 253 205 0468 US
+• +1 253 215 8782 US (Tacoma)
+
+Meeting ID: 496 012 7137
+
+Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
+
     # Initialize session state for tasks and options
     if "tasks" not in st.session_state:
         st.session_state.tasks = []
@@ -96,6 +154,18 @@ def main():
         st.session_state.leads_per_block = 6
     if "invites_sent" not in st.session_state:
         st.session_state.invites_sent = False
+    if "current_task_index" not in st.session_state:
+        st.session_state.current_task_index = 0
+    if "review_mode" not in st.session_state:
+        st.session_state.review_mode = False
+    if "current_title" not in st.session_state:
+        st.session_state.current_title = ""
+    if "current_description" not in st.session_state:
+        st.session_state.current_description = ""
+    if "template_title" not in st.session_state:
+        st.session_state.template_title = "Intro {{first_name}} {{last_initial}} @  {{company}} + Barbara P @ Whiteboard Geeks"
+    if "template_description" not in st.session_state:
+        st.session_state.template_description = event_description_default
 
     # Initialize session state for search attempt
     if "search_attempted" not in st.session_state:
@@ -223,75 +293,28 @@ def main():
 
                             # Add template fields for event customization only after time slots are found and valid
                             st.subheader("Event Customization")
-                            event_title_template = st.text_input(
+                            title_input = st.text_input(
                                 "Event Title Template:",
-                                "Intro {{first_name}} {{last_initial}} @  {{company}} + Barbara P @ Whiteboard Geeks",
+                                value=st.session_state.template_title,
                                 help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
                                 key="event_title_template",
                             )
-                            event_description_default = """Hi {{first_name}},
+                            if title_input != st.session_state.template_title:
+                                st.session_state.template_title = title_input
 
-I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for medical companies. Not terribly long ago I sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
-
-I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Medtronic, Eli Lilly, and Cleveland Clinic. 
-
-If this time doesn't work for you please feel free to propose one that does. Whatever is convenient.
-
-Agenda:
-- Share science behind the Whiteboard Geeks success stories, benchmarking data, and observed industry trends
-- Learn about your current objectives and challenges
-- Get feedback on the usefulness of Whiteboard Geeks services for your organization
-- Plus we'll unlock the vault and show you videos related to your specific challenge-because videos are fun 😊🎥⭐
-
-As a bonus: I'll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
-
-Zoom Call information:
-Barbara Pigg is inviting you to a scheduled Zoom meeting.
-
-Topic: Barbara Pigg's Personal Meeting Room
-
-Join Zoom Meeting
-https://us02web.zoom.us/j/4960127137
-
-Meeting ID: 496 012 7137
-
----
-
-One tap mobile
-+16469313860,,4960127137# US
-+13017158592,,4960127137# US (Washington DC)
-
----
-
-Dial by your location
-• +1 646 931 3860 US
-• +1 301 715 8592 US (Washington DC)
-• +1 305 224 1968 US
-• +1 309 205 3325 US
-• +1 312 626 6799 US (Chicago)
-• +1 646 558 8656 US (New York)
-• +1 346 248 7799 US (Houston)
-• +1 360 209 5623 US
-• +1 386 347 5053 US
-• +1 507 473 4847 US
-• +1 564 217 2000 US
-• +1 669 444 9171 US
-• +1 669 900 9128 US (San Jose)
-• +1 689 278 1000 US
-• +1 719 359 4580 US
-• +1 253 205 0468 US
-• +1 253 215 8782 US (Tacoma)
-
-Meeting ID: 496 012 7137
-
-Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
-"""
-                            event_description_template = st.text_area(
+                            description_input = st.text_area(
                                 "Event Description Template:",
-                                event_description_default,
+                                value=st.session_state.template_description,
                                 help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
                                 key="event_description_template",
                             )
+                            if (
+                                description_input
+                                != st.session_state.template_description
+                            ):
+                                st.session_state.template_description = (
+                                    description_input
+                                )
 
                             # Show example of template output with first task's data
                             if st.session_state.tasks:
@@ -305,10 +328,10 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
                                 st.write("Company:", first_task["company_name"])
 
                                 example_title = calendar_utils.format_template(
-                                    event_title_template, first_task
+                                    st.session_state.template_title, first_task
                                 )
                                 example_desc = calendar_utils.format_template(
-                                    event_description_template,
+                                    st.session_state.template_description,
                                     first_task,
                                 )
 
@@ -326,66 +349,145 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
                 st.session_state.create_invites_clicked = False
 
             if st.session_state.get("time_looks_good", False):
-                if (
-                    st.button("Create Invites")
-                    or st.session_state.create_invites_clicked
-                ) and not st.session_state.invites_sent:
-                    st.session_state.create_invites_clicked = True
-                    st.session_state.invites_sent = True
-                    if st.session_state.placeholder_events:
-                        task_index = 0
-                        for placeholder_event in st.session_state.placeholder_events:
-                            if task_index >= len(st.session_state.tasks):
-                                break
+                if not st.session_state.review_mode and st.button("Review Invites"):
+                    st.session_state.review_mode = True
+                    st.session_state.current_task_index = 0
+                    # Initialize the first task's rendered templates
+                    task = st.session_state.tasks[0]
+                    st.session_state.current_title = calendar_utils.format_template(
+                        st.session_state.template_title, task
+                    )
+                    st.session_state.current_description = (
+                        calendar_utils.format_template(
+                            st.session_state.template_description, task
+                        )
+                    )
+                    st.rerun()
 
-                            start = placeholder_event["start"].get(
-                                "dateTime", placeholder_event["start"].get("date")
-                            )
-                            end = placeholder_event["end"].get(
-                                "dateTime", placeholder_event["end"].get("date")
-                            )
-                            start_dt = datetime.datetime.fromisoformat(start)
-                            end_dt = datetime.datetime.fromisoformat(end)
+                if st.session_state.review_mode:
+                    task = st.session_state.tasks[st.session_state.current_task_index]
+                    total_tasks = len(st.session_state.tasks)
 
-                            block_duration = (end_dt - start_dt).total_seconds() / 60
-                            meetings_per_block = int(
-                                block_duration // st.session_state.meeting_length
-                            )
+                    # Display progress
+                    st.write(
+                        f"Reviewing invite {st.session_state.current_task_index + 1} of {total_tasks}"
+                    )
 
-                            for _ in range(meetings_per_block):
-                                if task_index >= len(st.session_state.tasks):
-                                    break
+                    # Contact information at the top
+                    st.write("### Contact Information")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(
+                            f"**Name:** {task['contact_firstname']} {task['contact_lastname']}"
+                        )
+                        st.write(f"**Company:** {task['company_name']}")
+                    with col2:
+                        st.write(f"**Email:** {task['contact_email']}")
 
-                                for _ in range(st.session_state.leads_per_block):
-                                    if task_index >= len(st.session_state.tasks):
-                                        break
-
-                                    task = st.session_state.tasks[task_index]
-                                    meeting_end_dt = start_dt + datetime.timedelta(
-                                        minutes=st.session_state.meeting_length
-                                    )
-                                    try:
-                                        calendar_utils.create_calendar_invite(
-                                            task,
-                                            start_dt.isoformat(),
-                                            meeting_end_dt.isoformat(),
-                                            title_template=event_title_template,
-                                            description_template=event_description_template,
-                                        )
-                                        st.write(
-                                            f"Created invite for task: {task['text']} from {start_dt} to {meeting_end_dt}"
-                                        )
-                                        task_index += 1
-                                    except ValueError as e:
-                                        st.error(f"Failed to create invite: {str(e)}")
-                                        st.session_state.invites_sent = False
-                                        break
-
-                                start_dt += datetime.timedelta(
+                    # Send invite button at the top
+                    if st.button("Send Invite", key="send_invite"):
+                        try:
+                            # Find the next available slot
+                            for (
+                                placeholder_event
+                            ) in st.session_state.placeholder_events:
+                                start = placeholder_event["start"].get(
+                                    "dateTime", placeholder_event["start"].get("date")
+                                )
+                                start_dt = datetime.datetime.fromisoformat(start)
+                                meeting_end_dt = start_dt + datetime.timedelta(
                                     minutes=st.session_state.meeting_length
                                 )
-                    else:
-                        st.write("No available slots to create invites.")
+
+                                calendar_utils.create_calendar_invite(
+                                    task,
+                                    start_dt.isoformat(),
+                                    meeting_end_dt.isoformat(),
+                                    title_template=st.session_state.current_title,
+                                    description_template=st.session_state.current_description,
+                                )
+                                st.success(f"Invite sent to {task['contact_name']}")
+                                break
+
+                            # Move to next task
+                            st.session_state.current_task_index += 1
+                            if st.session_state.current_task_index < total_tasks:
+                                next_task = st.session_state.tasks[
+                                    st.session_state.current_task_index
+                                ]
+                                st.session_state.current_title = (
+                                    calendar_utils.format_template(
+                                        st.session_state.template_title, next_task
+                                    )
+                                )
+                                st.session_state.current_description = (
+                                    calendar_utils.format_template(
+                                        st.session_state.template_description,
+                                        next_task,
+                                    )
+                                )
+                            else:
+                                st.session_state.review_mode = False
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(f"Failed to create invite: {str(e)}")
+
+                    # Editable fields
+                    st.write("### Event Details")
+                    st.session_state.current_title = st.text_input(
+                        "Event Title",
+                        value=st.session_state.current_title,
+                        key=f"title_{st.session_state.current_task_index}",
+                    )
+                    st.session_state.current_description = st.text_area(
+                        "Event Description",
+                        value=st.session_state.current_description,
+                        key=f"desc_{st.session_state.current_task_index}",
+                    )
+
+                    # Navigation buttons
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.session_state.current_task_index > 0 and st.button(
+                            "Previous"
+                        ):
+                            st.session_state.current_task_index -= 1
+                            prev_task = st.session_state.tasks[
+                                st.session_state.current_task_index
+                            ]
+                            st.session_state.current_title = (
+                                calendar_utils.format_template(
+                                    st.session_state.template_title, prev_task
+                                )
+                            )
+                            st.session_state.current_description = (
+                                calendar_utils.format_template(
+                                    st.session_state.template_description,
+                                    prev_task,
+                                )
+                            )
+                            st.rerun()
+                    with col2:
+                        if (
+                            st.session_state.current_task_index < total_tasks - 1
+                            and st.button("Next")
+                        ):
+                            st.session_state.current_task_index += 1
+                            next_task = st.session_state.tasks[
+                                st.session_state.current_task_index
+                            ]
+                            st.session_state.current_title = (
+                                calendar_utils.format_template(
+                                    st.session_state.template_title, next_task
+                                )
+                            )
+                            st.session_state.current_description = (
+                                calendar_utils.format_template(
+                                    st.session_state.template_description,
+                                    next_task,
+                                )
+                            )
+                            st.rerun()
         else:
             st.write("No tasks found.")
 
