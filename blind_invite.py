@@ -110,7 +110,7 @@ def main():
     if not st.session_state.authenticated:
         password = st.text_input("Enter password:", type="password")
         if st.button("Login"):
-            if password == "markersqueaks":
+            if password == st.secrets["PASSWORD"]:
                 st.session_state.authenticated = True
                 st.rerun()
             else:
