@@ -75,6 +75,8 @@ def main():
         st.session_state.meeting_length = 15
     if "leads_per_block" not in st.session_state:
         st.session_state.leads_per_block = 6
+    if "invites_sent" not in st.session_state:
+        st.session_state.invites_sent = False
 
     # Initialize session state for search attempt
     if "search_attempted" not in st.session_state:
@@ -152,6 +154,10 @@ def main():
                 st.session_state.prev_placeholder_name = placeholder_event_name
 
             if st.button("Find Placeholder Slots"):
+                # Reset invite state when finding new slots
+                st.session_state.invites_sent = False
+                st.session_state.create_invites_clicked = False
+
                 placeholder_events = calendar_utils.find_placeholder_events(
                     placeholder_event_name
                 )
@@ -206,8 +212,9 @@ def main():
                 if (
                     st.button("Create Invites")
                     or st.session_state.create_invites_clicked
-                ):
+                ) and not st.session_state.invites_sent:
                     st.session_state.create_invites_clicked = True
+                    st.session_state.invites_sent = True
                     if st.session_state.placeholder_events:
                         task_index = 0
                         for placeholder_event in st.session_state.placeholder_events:
