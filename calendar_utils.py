@@ -12,6 +12,15 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 CALENDAR_ID = "lance@whiteboardgeeks.com"
 
 
+def format_template(template, task):
+    """Formats a template string using task data."""
+    return (
+        template.replace("{{first_name}}", task.get("contact_firstname", ""))
+        .replace("{{last_name}}", task.get("contact_lastname", ""))
+        .replace("{{company}}", task.get("company_name", ""))
+    )
+
+
 def get_calendar_service():
     """Returns an authorized Google Calendar API service instance."""
     creds = None
@@ -62,14 +71,25 @@ def find_placeholder_events(query="Blind Invite"):
         print(f"An error occurred: {error}")
 
 
-def create_calendar_invite(task, start_time, end_time):
+def create_calendar_invite(
+    task, start_time, end_time, title_template=None, description_template=None
+):
     """Creates a calendar invite for a given task."""
     try:
+        if not title_template or not description_template:
+            raise ValueError(
+                "Both title_template and description_template are required"
+            )
+
         service = get_calendar_service()
 
+        # Format title and description using templates
+        title = format_template(title_template, task)
+        description = format_template(description_template, task)
+
         event = {
-            "summary": "Test event",
-            "description": f"Task from Close CRM: {task['text']}",
+            "summary": title,
+            "description": description,
             "start": {
                 "dateTime": start_time,
                 "timeZone": "UTC",

@@ -161,6 +161,100 @@ def main():
                 "Placeholder event name:", "Blind invite", key="placeholder_name_input"
             )
 
+            # Add template fields for event customization
+            st.subheader("Event Customization")
+            event_title_template = st.text_input(
+                "Event Title Template:",
+                "Intro {{first_name}} @  {{company}} + Barbara P @ Whiteboard Geeks",
+                help="Use {{first_name}}, {{last_name}}, and {{company}} as placeholders",
+                key="event_title_template",
+            )
+            event_description_default = """Hi {{first_name}},
+
+I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for medical companies. Not terribly long ago I sent you a package with what we call a ‘Video Card’ or ‘Video Brochure’. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
+
+I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Medtronic, Eli Lilly, and Cleveland Clinic. 
+
+If this time doesn't work for you please feel free to propose one that does. Whatever is convenient.
+
+Agenda:
+- Share science behind the Whiteboard Geeks success stories, benchmarking data, and observed industry trends
+- Learn about your current objectives and challenges
+- Get feedback on the usefulness of Whiteboard Geeks services for your organization
+- Plus we'll unlock the vault and show you videos related to your specific challenge-because videos are fun 😊🎥⭐
+
+As a bonus: I'll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
+
+Zoom Call information:
+Barbara Pigg is inviting you to a scheduled Zoom meeting.
+
+Topic: Barbara Pigg's Personal Meeting Room
+
+Join Zoom Meeting
+https://us02web.zoom.us/j/4960127137
+
+Meeting ID: 496 012 7137
+
+---
+
+One tap mobile
++16469313860,,4960127137# US
++13017158592,,4960127137# US (Washington DC)
+
+---
+
+Dial by your location
+• +1 646 931 3860 US
+• +1 301 715 8592 US (Washington DC)
+• +1 305 224 1968 US
+• +1 309 205 3325 US
+• +1 312 626 6799 US (Chicago)
+• +1 646 558 8656 US (New York)
+• +1 346 248 7799 US (Houston)
+• +1 360 209 5623 US
+• +1 386 347 5053 US
+• +1 507 473 4847 US
+• +1 564 217 2000 US
+• +1 669 444 9171 US
+• +1 669 900 9128 US (San Jose)
+• +1 689 278 1000 US
+• +1 719 359 4580 US
+• +1 253 205 0468 US
+• +1 253 215 8782 US (Tacoma)
+
+Meeting ID: 496 012 7137
+
+Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
+"""
+            event_description_template = st.text_area(
+                "Event Description Template:",
+                event_description_default,
+                help="Use {{first_name}}, {{last_name}}, and {{company}} as placeholders",
+                key="event_description_template",
+            )
+
+            # Show example of template output with first task's data
+            if st.session_state.tasks:
+                first_task = st.session_state.tasks[0]
+                st.subheader("Preview with first task's data:")
+                st.write(
+                    "Contact:",
+                    first_task["contact_firstname"],
+                    first_task["contact_lastname"],
+                )
+                st.write("Company:", first_task["company_name"])
+
+                example_title = calendar_utils.format_template(
+                    event_title_template, first_task
+                )
+                example_desc = calendar_utils.format_template(
+                    event_description_template,
+                    first_task,
+                )
+
+                st.write("Your event title will look like:", example_title)
+                st.write("Your description will look like:", example_desc)
+
             # Reset flags if placeholder name changed
             if "prev_placeholder_name" not in st.session_state:
                 st.session_state.prev_placeholder_name = placeholder_event_name
@@ -263,15 +357,22 @@ def main():
                                     meeting_end_dt = start_dt + datetime.timedelta(
                                         minutes=st.session_state.meeting_length
                                     )
-                                    calendar_utils.create_calendar_invite(
-                                        task,
-                                        start_dt.isoformat(),
-                                        meeting_end_dt.isoformat(),
-                                    )
-                                    st.write(
-                                        f"Created invite for task: {task['text']} from {start_dt} to {meeting_end_dt}"
-                                    )
-                                    task_index += 1
+                                    try:
+                                        calendar_utils.create_calendar_invite(
+                                            task,
+                                            start_dt.isoformat(),
+                                            meeting_end_dt.isoformat(),
+                                            title_template=event_title_template,
+                                            description_template=event_description_template,
+                                        )
+                                        st.write(
+                                            f"Created invite for task: {task['text']} from {start_dt} to {meeting_end_dt}"
+                                        )
+                                        task_index += 1
+                                    except ValueError as e:
+                                        st.error(f"Failed to create invite: {str(e)}")
+                                        st.session_state.invites_sent = False
+                                        break
 
                                 start_dt += datetime.timedelta(
                                     minutes=st.session_state.meeting_length
