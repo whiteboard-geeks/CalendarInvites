@@ -444,50 +444,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                         value=st.session_state.current_description,
                         key=f"desc_{st.session_state.current_task_index}",
                     )
-
-                    # Navigation buttons
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.session_state.current_task_index > 0 and st.button(
-                            "Previous"
-                        ):
-                            st.session_state.current_task_index -= 1
-                            prev_task = st.session_state.tasks[
-                                st.session_state.current_task_index
-                            ]
-                            st.session_state.current_title = (
-                                calendar_utils.format_template(
-                                    st.session_state.template_title, prev_task
-                                )
-                            )
-                            st.session_state.current_description = (
-                                calendar_utils.format_template(
-                                    st.session_state.template_description,
-                                    prev_task,
-                                )
-                            )
-                            st.rerun()
-                    with col2:
-                        if (
-                            st.session_state.current_task_index < total_tasks - 1
-                            and st.button("Next")
-                        ):
-                            st.session_state.current_task_index += 1
-                            next_task = st.session_state.tasks[
-                                st.session_state.current_task_index
-                            ]
-                            st.session_state.current_title = (
-                                calendar_utils.format_template(
-                                    st.session_state.template_title, next_task
-                                )
-                            )
-                            st.session_state.current_description = (
-                                calendar_utils.format_template(
-                                    st.session_state.template_description,
-                                    next_task,
-                                )
-                            )
-                            st.rerun()
         else:
             st.write("No tasks found.")
 
