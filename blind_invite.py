@@ -34,6 +34,16 @@ def search_tasks_in_close(task_search, close_api_key):
         return []
 
 
+def split_contact_name(full_name):
+    name_parts = full_name.split()
+    if len(name_parts) == 1:
+        return name_parts[0], ""
+    elif len(name_parts) == 2:
+        return name_parts[0], name_parts[1]
+    else:
+        return f"{name_parts[0]} {name_parts[1]}", name_parts[2]
+
+
 def get_lead_info(lead_id, close_api_key):
     encoded_api_key = base64.b64encode(f"{close_api_key}:".encode()).decode()
     url = f"https://api.close.com/api/v1/lead/{lead_id}"
@@ -45,7 +55,11 @@ def get_lead_info(lead_id, close_api_key):
     if response.status_code == 200:
         lead_data = response.json()
         lead_data["company_name"] = lead_data["name"].split("-")[0]
-        lead_data["contact_name"] = lead_data["contacts"][0]["name"]
+        contact_name = lead_data["contacts"][0]["name"]
+        lead_data["contact_name"] = contact_name
+        lead_data["contact_firstname"], lead_data["contact_lastname"] = (
+            split_contact_name(contact_name)
+        )
         lead_data["contact_email"] = lead_data["contacts"][0]["emails"][0]["email"]
         return lead_data
     else:
@@ -61,6 +75,8 @@ def append_lead_info_to_tasks(tasks, close_api_key):
         task["company_name"] = lead_info["company_name"]
         task["contact_name"] = lead_info["contact_name"]
         task["contact_email"] = lead_info["contact_email"]
+        task["contact_firstname"] = lead_info["contact_firstname"]
+        task["contact_lastname"] = lead_info["contact_lastname"]
         updated_tasks.append(task)
     return updated_tasks
 
