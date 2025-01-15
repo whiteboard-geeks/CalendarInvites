@@ -7,7 +7,7 @@ from googleapiclient.errors import HttpError
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
-CALENDAR_ID = "lance@whiteboardgeeks.com"
+CALENDAR_ID = "barbara.pigg@whiteboardgeeks.com"
 
 
 def format_template(template, task):
@@ -125,7 +125,7 @@ def create_calendar_invite(
             },
             "attendees": [
                 {
-                    "email": "lance@whiteboardgeeks.com",
+                    "email": "barbara.pigg@whiteboardgeeks.com",
                     "responseStatus": "accepted",
                     "self": True,
                 },
