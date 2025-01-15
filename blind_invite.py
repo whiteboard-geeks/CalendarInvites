@@ -102,6 +102,21 @@ def append_lead_info_to_tasks(tasks, close_api_key):
 
 def main():
     st.set_page_config(page_title="Auto Calendar Invites")
+
+    # Password protection
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if not st.session_state.authenticated:
+        password = st.text_input("Enter password:", type="password")
+        if st.button("Login"):
+            if password == "markersqueaks":
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
+        return
+
     st.title("Auto Calendar Invites")
 
     # Default event description template
