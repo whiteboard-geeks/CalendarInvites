@@ -1,7 +1,8 @@
 .streamlit
 env
-.vscode/*
+.vscode
 credentials.json
 __pycache__/
 token.json
 pseudocode.md
+*.json
