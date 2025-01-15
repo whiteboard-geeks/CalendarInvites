@@ -90,6 +90,7 @@ def create_calendar_invite(
         event = {
             "summary": title,
             "description": description,
+            "location": "https://us02web.zoom.us/j/4960127137",
             "start": {
                 "dateTime": start_time,
                 "timeZone": "UTC",
@@ -99,6 +100,11 @@ def create_calendar_invite(
                 "timeZone": "UTC",
             },
             "attendees": [
+                {
+                    "email": "lance@whiteboardgeeks.com",
+                    "responseStatus": "accepted",
+                    "self": True,
+                },
                 {"email": task["contact_email"]},
             ],
         }
