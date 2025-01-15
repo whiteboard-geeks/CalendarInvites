@@ -34,6 +34,37 @@ def search_tasks_in_close(task_search, close_api_key):
         return []
 
 
+def get_lead_info(lead_id, close_api_key):
+    encoded_api_key = base64.b64encode(f"{close_api_key}:".encode()).decode()
+    url = f"https://api.close.com/api/v1/lead/{lead_id}"
+    headers = {
+        "Authorization": f"Basic {encoded_api_key}",
+        "Content-Type": "application/json",
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        lead_data = response.json()
+        lead_data["company_name"] = lead_data["name"].split("-")[0]
+        lead_data["contact_name"] = lead_data["contacts"][0]["name"]
+        lead_data["contact_email"] = lead_data["contacts"][0]["emails"][0]["email"]
+        return lead_data
+    else:
+        st.error("Lead fetch failed")
+        return None
+
+
+def append_lead_info_to_tasks(tasks, close_api_key):
+    updated_tasks = []
+    for task in tasks:
+        lead_info = get_lead_info(task["lead_id"], close_api_key)
+        task["lead_id"] = lead_info["id"]
+        task["company_name"] = lead_info["company_name"]
+        task["contact_name"] = lead_info["contact_name"]
+        task["contact_email"] = lead_info["contact_email"]
+        updated_tasks.append(task)
+    return updated_tasks
+
+
 def main():
     st.title("Automated Calendar Invites")
 
@@ -58,6 +89,9 @@ def main():
     if st.button("Search Tasks") and task_search:
         with st.spinner("Searching for tasks..."):
             st.session_state.tasks = search_tasks_in_close(task_search, close_api_key)
+            st.session_state.tasks = append_lead_info_to_tasks(
+                st.session_state.tasks, close_api_key
+            )
             st.session_state.search_attempted = True
 
     if st.session_state.search_attempted:
