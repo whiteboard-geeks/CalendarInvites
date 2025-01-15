@@ -77,6 +77,9 @@ def append_lead_info_to_tasks(tasks, close_api_key):
         task["contact_email"] = lead_info["contact_email"]
         task["contact_firstname"] = lead_info["contact_firstname"]
         task["contact_lastname"] = lead_info["contact_lastname"]
+        task["contact_lastinitial"] = (
+            lead_info["contact_lastname"][0] if lead_info["contact_lastname"] else ""
+        )
         updated_tasks.append(task)
     return updated_tasks
 
@@ -165,8 +168,8 @@ def main():
             st.subheader("Event Customization")
             event_title_template = st.text_input(
                 "Event Title Template:",
-                "Intro {{first_name}} @  {{company}} + Barbara P @ Whiteboard Geeks",
-                help="Use {{first_name}}, {{last_name}}, and {{company}} as placeholders",
+                "Intro {{first_name}} {{last_initial}} @  {{company}} + Barbara P @ Whiteboard Geeks",
+                help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
                 key="event_title_template",
             )
             event_description_default = """Hi {{first_name}},
@@ -229,7 +232,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
             event_description_template = st.text_area(
                 "Event Description Template:",
                 event_description_default,
-                help="Use {{first_name}}, {{last_name}}, and {{company}} as placeholders",
+                help="Use {{first_name}}, {{last_name}}, {{company}}, and {{last_initial}} as placeholders",
                 key="event_description_template",
             )
 

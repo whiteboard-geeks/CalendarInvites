@@ -18,6 +18,7 @@ def format_template(template, task):
         template.replace("{{first_name}}", task.get("contact_firstname", ""))
         .replace("{{last_name}}", task.get("contact_lastname", ""))
         .replace("{{company}}", task.get("company_name", ""))
+        .replace("{{last_initial}}", task.get("contact_lastinitial", ""))
     )
 
 
