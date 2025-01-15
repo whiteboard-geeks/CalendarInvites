@@ -79,7 +79,7 @@ def create_calendar_invite(task, start_time, end_time):
                 "timeZone": "UTC",
             },
             "attendees": [
-                {"email": "lance@servantrealestate.com"},
+                {"email": task["contact_email"]},
             ],
         }
 
