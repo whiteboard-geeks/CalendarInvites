@@ -83,7 +83,11 @@ def create_calendar_invite(task, start_time, end_time):
             ],
         }
 
-        event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        event = (
+            service.events()
+            .insert(calendarId=CALENDAR_ID, body=event, sendUpdates="all")
+            .execute()
+        )
         return event
 
     except HttpError as error:
