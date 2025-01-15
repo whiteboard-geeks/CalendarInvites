@@ -1,10 +1,7 @@
 import datetime
-import json
 import streamlit as st
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -23,53 +20,45 @@ def format_template(template, task):
     )
 
 
-def create_credentials_dict():
-    """Creates a credentials dictionary from Streamlit secrets."""
-    return {
-        "web": {
-            "client_id": st.secrets.google_calendar["client_id"],
-            "project_id": st.secrets.google_calendar["project_id"],
-            "auth_uri": st.secrets.google_calendar["auth_uri"],
-            "token_uri": st.secrets.google_calendar["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets.google_calendar[
+def get_calendar_service():
+    """Returns an authorized Google Calendar API service instance using a service account."""
+    try:
+        # Get the service account info from streamlit secrets
+        service_account_info = {
+            "type": "service_account",
+            "project_id": st.secrets.google_calendar_service_account["project_id"],
+            "private_key_id": st.secrets.google_calendar_service_account[
+                "private_key_id"
+            ],
+            "private_key": st.secrets.google_calendar_service_account["private_key"],
+            "client_email": st.secrets.google_calendar_service_account["client_email"],
+            "client_id": st.secrets.google_calendar_service_account["client_id"],
+            "auth_uri": st.secrets.google_calendar_service_account["auth_uri"],
+            "token_uri": st.secrets.google_calendar_service_account["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets.google_calendar_service_account[
                 "auth_provider_x509_cert_url"
             ],
-            "client_secret": st.secrets.google_calendar["client_secret"],
-            "redirect_uris": st.secrets.google_calendar["redirect_uris"],
-            "javascript_origins": st.secrets.google_calendar["javascript_origins"],
+            "client_x509_cert_url": st.secrets.google_calendar_service_account[
+                "client_x509_cert_url"
+            ],
+            "universe_domain": st.secrets.google_calendar_service_account[
+                "universe_domain"
+            ],
         }
-    }
 
+        credentials = service_account.Credentials.from_service_account_info(
+            service_account_info,
+            scopes=SCOPES,
+        )
 
-def get_calendar_service():
-    """Returns an authorized Google Calendar API service instance."""
-    creds = None
+        # Create delegated credentials for the calendar owner
+        delegated_credentials = credentials.with_subject(CALENDAR_ID)
 
-    # Try to load from streamlit secrets if token exists
-    if "token" in st.session_state:
-        creds = Credentials.from_authorized_user_info(st.session_state["token"], SCOPES)
+        return build("calendar", "v3", credentials=delegated_credentials)
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            credentials_dict = create_credentials_dict()
-
-            # Create OAuth flow using InstalledAppFlow for local server
-            flow = InstalledAppFlow.from_client_config(
-                credentials_dict,
-                SCOPES,
-            )
-
-            # Run the local server flow on a different port
-            creds = flow.run_local_server(port=8502)
-
-            # Store the credentials in session state
-            st.session_state["token"] = json.loads(creds.to_json())
-            st.success("Successfully authenticated!")
-            st.rerun()  # Rerun the app to use the new credentials
-
-    return build("calendar", "v3", credentials=creds)
+    except Exception as e:
+        st.error(f"Error setting up service account: {str(e)}")
+        return None
 
 
 def find_placeholder_events(query="Blind Invite"):
@@ -84,7 +73,7 @@ def find_placeholder_events(query="Blind Invite"):
         events_result = (
             service.events()
             .list(
-                calendarId="lance@whiteboardgeeks.com",
+                calendarId=CALENDAR_ID,
                 timeMin=now,
                 maxResults=10,
                 singleEvents=True,
