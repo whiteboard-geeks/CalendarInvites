@@ -1,5 +1,6 @@
 import datetime
-import os.path
+import json
+import streamlit as st
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -22,19 +23,52 @@ def format_template(template, task):
     )
 
 
+def create_credentials_dict():
+    """Creates a credentials dictionary from Streamlit secrets."""
+    return {
+        "web": {
+            "client_id": st.secrets.google_calendar["client_id"],
+            "project_id": st.secrets.google_calendar["project_id"],
+            "auth_uri": st.secrets.google_calendar["auth_uri"],
+            "token_uri": st.secrets.google_calendar["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets.google_calendar[
+                "auth_provider_x509_cert_url"
+            ],
+            "client_secret": st.secrets.google_calendar["client_secret"],
+            "redirect_uris": st.secrets.google_calendar["redirect_uris"],
+            "javascript_origins": st.secrets.google_calendar["javascript_origins"],
+        }
+    }
+
+
 def get_calendar_service():
     """Returns an authorized Google Calendar API service instance."""
     creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+
+    # Try to load from streamlit secrets if token exists
+    if "token" in st.session_state:
+        creds = Credentials.from_authorized_user_info(st.session_state["token"], SCOPES)
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
+            credentials_dict = create_credentials_dict()
+
+            # Create OAuth flow using InstalledAppFlow for local server
+            flow = InstalledAppFlow.from_client_config(
+                credentials_dict,
+                SCOPES,
+            )
+
+            # Run the local server flow on a different port
+            creds = flow.run_local_server(port=8502)
+
+            # Store the credentials in session state
+            st.session_state["token"] = json.loads(creds.to_json())
+            st.success("Successfully authenticated!")
+            st.rerun()  # Rerun the app to use the new credentials
+
     return build("calendar", "v3", credentials=creds)
 
 
