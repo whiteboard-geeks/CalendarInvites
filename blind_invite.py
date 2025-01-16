@@ -311,14 +311,56 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                             )
                         st.write("Please update these blocks and re-run.")
                     else:
-                        # Check total event time
-                        required_time = (
-                            len(st.session_state.tasks)
-                            * st.session_state.meeting_length
-                        ) / st.session_state.leads_per_block
-                        if total_event_time < required_time:
+                        # Calculate total available capacity considering existing events
+                        total_available_slots = 0
+                        for event in placeholder_events:
+                            start = event["start"].get(
+                                "dateTime", event["start"].get("date")
+                            )
+                            end = event["end"].get("dateTime", event["end"].get("date"))
+                            start_dt = datetime.datetime.fromisoformat(start)
+                            end_dt = datetime.datetime.fromisoformat(end)
+
+                            # Calculate number of slots in this placeholder event
+                            event_duration = (end_dt - start_dt).total_seconds() / 60
+                            num_slots = int(
+                                event_duration / st.session_state.meeting_length
+                            )
+
+                            # Check each slot's availability
+                            for slot_index in range(num_slots):
+                                slot_start = start_dt + datetime.timedelta(
+                                    minutes=slot_index * st.session_state.meeting_length
+                                )
+                                slot_end = slot_start + datetime.timedelta(
+                                    minutes=st.session_state.meeting_length
+                                )
+
+                                # Get existing events in this slot
+                                existing_events = calendar_utils.get_events_in_range(
+                                    slot_start.isoformat(),
+                                    slot_end.isoformat(),
+                                )
+
+                                # Count events that overlap with this slot (excluding placeholder events)
+                                events_in_slot = len(
+                                    [
+                                        event
+                                        for event in existing_events
+                                        if event["summary"] != placeholder_event_name
+                                    ]
+                                )
+
+                                # Add available capacity in this slot
+                                available_in_slot = max(
+                                    0, st.session_state.leads_per_block - events_in_slot
+                                )
+                                total_available_slots += available_in_slot
+
+                        # Check if we have enough total capacity
+                        if total_available_slots < len(st.session_state.tasks):
                             st.write(
-                                "You need to add more time to accommodate all tasks."
+                                f"Not enough available capacity in the placeholder slots. Need {len(st.session_state.tasks)} slots but only have {total_available_slots} available after accounting for existing events."
                             )
                         else:
                             st.write("✅ Time looks good")
@@ -451,15 +493,33 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                     if slot_key not in st.session_state.slot_usage:
                                         st.session_state.slot_usage[slot_key] = 0
 
-                                    # Check if slot has capacity
-                                    if (
-                                        st.session_state.slot_usage[slot_key]
-                                        < st.session_state.leads_per_block
-                                    ):
-                                        slot_end = slot_start + datetime.timedelta(
-                                            minutes=st.session_state.meeting_length
+                                    # Get existing events in this slot
+                                    slot_end = slot_start + datetime.timedelta(
+                                        minutes=st.session_state.meeting_length
+                                    )
+                                    existing_events = (
+                                        calendar_utils.get_events_in_range(
+                                            slot_start.isoformat(),
+                                            slot_end.isoformat(),
                                         )
+                                    )
 
+                                    # Count events that overlap with this slot (excluding placeholder events)
+                                    events_in_slot = len(
+                                        [
+                                            event
+                                            for event in existing_events
+                                            if event["summary"]
+                                            != placeholder_event_name
+                                        ]
+                                    )
+
+                                    # Check if slot has capacity (considering both tracked invites and existing events)
+                                    total_events = (
+                                        st.session_state.slot_usage[slot_key]
+                                        + events_in_slot
+                                    )
+                                    if total_events < st.session_state.leads_per_block:
                                         # Create the calendar invite
                                         calendar_utils.create_calendar_invite(
                                             task,

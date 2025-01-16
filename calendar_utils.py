@@ -144,6 +144,33 @@ def create_calendar_invite(
         print(f"An error occurred: {error}")
 
 
+def get_events_in_range(start_time, end_time):
+    """Gets all calendar events within a given time range."""
+    try:
+        service = get_calendar_service()
+
+        # Remove any 'Z' suffix if the timestamp already has a timezone offset
+        start_time = start_time.replace("-05:00Z", "-05:00").replace("Z", "")
+        end_time = end_time.replace("-05:00Z", "-05:00").replace("Z", "")
+
+        events_result = (
+            service.events()
+            .list(
+                calendarId=CALENDAR_ID,
+                timeMin=start_time,
+                timeMax=end_time,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
+        )
+
+        return events_result.get("items", [])
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return []
+
+
 if __name__ == "__main__":
     # Find placeholder events
     events = find_placeholder_events()
