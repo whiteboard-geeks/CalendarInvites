@@ -198,6 +198,8 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
         st.session_state.template_title = "Intro {{first_name}} {{last_initial}} @  {{company}} + Barbara P @ Whiteboard Geeks"
     if "template_description" not in st.session_state:
         st.session_state.template_description = event_description_default
+    if "slot_usage" not in st.session_state:
+        st.session_state.slot_usage = {}  # Will track {slot_start_time: number_of_leads}
 
     # Initialize session state for search attempt
     if "search_attempted" not in st.session_state:
@@ -416,43 +418,89 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                     if st.button("Send Invite", key="send_invite"):
                         try:
                             # Find the next available slot
+                            slot_found = False
                             for (
                                 placeholder_event
                             ) in st.session_state.placeholder_events:
                                 start = placeholder_event["start"].get(
                                     "dateTime", placeholder_event["start"].get("date")
                                 )
+                                end = placeholder_event["end"].get(
+                                    "dateTime", placeholder_event["end"].get("date")
+                                )
                                 start_dt = datetime.datetime.fromisoformat(start)
-                                meeting_end_dt = start_dt + datetime.timedelta(
-                                    minutes=st.session_state.meeting_length
+                                end_dt = datetime.datetime.fromisoformat(end)
+
+                                # Calculate number of slots in this placeholder event
+                                event_duration = (
+                                    end_dt - start_dt
+                                ).total_seconds() / 60
+                                num_slots = int(
+                                    event_duration / st.session_state.meeting_length
                                 )
 
-                                calendar_utils.create_calendar_invite(
-                                    task,
-                                    start_dt.isoformat(),
-                                    meeting_end_dt.isoformat(),
-                                    title_template=st.session_state.current_title,
-                                    description_template=st.session_state.current_description,
+                                # Try each slot in this placeholder event
+                                for slot_index in range(num_slots):
+                                    slot_start = start_dt + datetime.timedelta(
+                                        minutes=slot_index
+                                        * st.session_state.meeting_length
+                                    )
+                                    slot_key = slot_start.isoformat()
+
+                                    # Initialize slot usage if not exists
+                                    if slot_key not in st.session_state.slot_usage:
+                                        st.session_state.slot_usage[slot_key] = 0
+
+                                    # Check if slot has capacity
+                                    if (
+                                        st.session_state.slot_usage[slot_key]
+                                        < st.session_state.leads_per_block
+                                    ):
+                                        slot_end = slot_start + datetime.timedelta(
+                                            minutes=st.session_state.meeting_length
+                                        )
+
+                                        # Create the calendar invite
+                                        calendar_utils.create_calendar_invite(
+                                            task,
+                                            slot_start.isoformat(),
+                                            slot_end.isoformat(),
+                                            title_template=st.session_state.current_title,
+                                            description_template=st.session_state.current_description,
+                                        )
+
+                                        # Update slot usage
+                                        st.session_state.slot_usage[slot_key] += 1
+                                        slot_found = True
+
+                                        # Mark task as complete and update UI
+                                        try:
+                                            mark_task_complete_in_close(
+                                                task["id"], close_api_key
+                                            )
+                                            st.success(
+                                                f"Invite sent to {task['contact_name']} and task marked as complete"
+                                            )
+                                            # Remove the completed task from session state
+                                            st.session_state.tasks = [
+                                                t
+                                                for t in st.session_state.tasks
+                                                if t["id"] != task["id"]
+                                            ]
+                                        except ValueError as e:
+                                            st.warning(
+                                                f"Invite sent but failed to mark task as complete: {str(e)}"
+                                            )
+                                        break
+
+                                if slot_found:
+                                    break
+
+                            if not slot_found:
+                                st.error(
+                                    "No available slots found. All slots are at capacity."
                                 )
-                                # Mark the task as complete in Close CRM
-                                try:
-                                    mark_task_complete_in_close(
-                                        task["id"], close_api_key
-                                    )
-                                    st.success(
-                                        f"Invite sent to {task['contact_name']} and task marked as complete"
-                                    )
-                                    # Remove the completed task from session state
-                                    st.session_state.tasks = [
-                                        t
-                                        for t in st.session_state.tasks
-                                        if t["id"] != task["id"]
-                                    ]
-                                except ValueError as e:
-                                    st.warning(
-                                        f"Invite sent but failed to mark task as complete: {str(e)}"
-                                    )
-                                break
+                                return
 
                             # Move to next task if there are any remaining
                             if st.session_state.tasks:
