@@ -181,7 +181,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
     if "tasks" not in st.session_state:
         st.session_state.tasks = []
     if "meeting_length" not in st.session_state:
-        st.session_state.meeting_length = 15
+        st.session_state.meeting_length = 30
     if "leads_per_block" not in st.session_state:
         st.session_state.leads_per_block = 6
     if "invites_sent" not in st.session_state:
