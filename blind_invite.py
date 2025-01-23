@@ -50,6 +50,27 @@ def mark_task_complete_in_close(task_id, close_api_key):
     return response.json()
 
 
+def create_blind_invite_custom_activity_in_close(
+    lead_id, close_api_key, date_of_meeting, date_invite_sent
+):
+    encoded_api_key = base64.b64encode(f"{close_api_key}:".encode()).decode()
+    url = "https://api.close.com/api/v1/activity/custom/"
+    headers = {
+        "Authorization": f"Basic {encoded_api_key}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "custom_activity_type_id": "actitype_0CmcjmRFeEsO3yJFnLLVpS",
+        "lead_id": lead_id,
+        "custom.cf_HiNTk2RNrqwaf0Uq4zgCOp6dB5v6IYy5KedqOaraZAB": date_of_meeting,
+        "custom.cf_4Z6vPUo0xgW8CiECtoBSiMuA50RHsO0cVxFxsp9lq9u": date_invite_sent,
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code != 200:
+        raise ValueError(f"Failed to create custom activity: {response.text}")
+    return response.json()
+
+
 def split_contact_name(full_name):
     name_parts = full_name.split()
     if len(name_parts) == 1:
@@ -538,8 +559,16 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                             mark_task_complete_in_close(
                                                 task["id"], close_api_key
                                             )
+                                            create_blind_invite_custom_activity_in_close(
+                                                task["lead_id"],
+                                                close_api_key,
+                                                slot_start.date().isoformat(),
+                                                datetime.datetime.now()
+                                                .date()
+                                                .isoformat(),
+                                            )
                                             st.success(
-                                                f"Invite sent to {task['contact_name']} and task marked as complete"
+                                                f"Invite sent to {task['contact_name']} and task marked as complete and custom activity created"
                                             )
                                             # Remove the completed task from session state
                                             st.session_state.tasks = [
