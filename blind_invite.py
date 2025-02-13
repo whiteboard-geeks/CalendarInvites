@@ -147,35 +147,70 @@ def get_lead_info(lead_id, close_api_key):
         "Authorization": f"Basic {encoded_api_key}",
         "Content-Type": "application/json",
     }
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        lead_data = response.json()
-        lead_data["company_name"] = lead_data["name"].split("-")[0]
-        contact_name = lead_data["contacts"][0]["name"]
-        lead_data["contact_name"] = contact_name
-        lead_data["contact_firstname"], lead_data["contact_lastname"] = (
-            split_contact_name(contact_name)
-        )
-        lead_data["contact_email"] = lead_data["contacts"][0]["emails"][0]["email"]
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # This will raise an exception for HTTP errors
 
-        # Add timezone information based on the lead's state
-        if lead_data.get("addresses") and len(lead_data["addresses"]) > 0:
-            state = lead_data["addresses"][0].get("state")
-            if state:
-                timezone_name = get_state_timezone(state)
-                if timezone_name:
-                    timezone = pytz.timezone(timezone_name)
-                    lead_data["timezone"] = timezone_name
-                    lead_data["timezone_offset"] = datetime.datetime.now(
-                        timezone
-                    ).strftime("%z")
-                    lead_data["timezone_abbr"] = datetime.datetime.now(
-                        timezone
-                    ).strftime("%Z")
+        if response.status_code == 200:
+            lead_data = response.json()
 
-        return lead_data
-    else:
-        st.error("Lead fetch failed")
+            # Check if lead has contacts
+            if not lead_data.get("contacts") or len(lead_data["contacts"]) == 0:
+                st.error(f"Lead {lead_id} has no contacts")
+                return None
+
+            # Check if contact has a name
+            contact = lead_data["contacts"][0]
+            if not contact.get("name"):
+                st.error(f"Contact in lead {lead_id} has no name")
+                return None
+
+            # Check if contact has an email
+            if not contact.get("emails") or len(contact["emails"]) == 0:
+                st.error(f"Contact in lead {lead_id} has no email")
+                return None
+
+            lead_data["company_name"] = lead_data["name"].split("-")[0]
+            contact_name = contact["name"]
+            lead_data["contact_name"] = contact_name
+            lead_data["contact_firstname"], lead_data["contact_lastname"] = (
+                split_contact_name(contact_name)
+            )
+            lead_data["contact_email"] = contact["emails"][0]["email"]
+
+            # Initialize timezone information
+            lead_data["timezone"] = None
+            lead_data["timezone_offset"] = None
+            lead_data["timezone_abbr"] = None
+            lead_data["timezone_error"] = None
+
+            # Add timezone information based on the lead's state if available
+            if lead_data.get("addresses") and len(lead_data["addresses"]) > 0:
+                state = lead_data["addresses"][0].get("state")
+                if state:
+                    timezone_name = get_state_timezone(state)
+                    if timezone_name:
+                        timezone = pytz.timezone(timezone_name)
+                        lead_data["timezone"] = timezone_name
+                        lead_data["timezone_offset"] = datetime.datetime.now(
+                            timezone
+                        ).strftime("%z")
+                        lead_data["timezone_abbr"] = datetime.datetime.now(
+                            timezone
+                        ).strftime("%Z")
+                    else:
+                        lead_data["timezone_error"] = f"Unknown state code: {state}"
+                else:
+                    lead_data["timezone_error"] = "No state found in address"
+            else:
+                lead_data["timezone_error"] = "No address found"
+
+            return lead_data
+        else:
+            st.error(f"Lead fetch failed with status code {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to fetch lead {lead_id}: {str(e)}")
         return None
 
 
@@ -183,6 +218,9 @@ def append_lead_info_to_tasks(tasks, close_api_key):
     updated_tasks = []
     for task in tasks:
         lead_info = get_lead_info(task["lead_id"], close_api_key)
+        if lead_info is None:
+            st.error(f"Failed to get lead info for task {task['id']}")
+            continue
         task["lead_id"] = lead_info["id"]
         task["company_name"] = lead_info["company_name"]
         task["contact_name"] = lead_info["contact_name"]
@@ -196,6 +234,7 @@ def append_lead_info_to_tasks(tasks, close_api_key):
         task["timezone"] = lead_info.get("timezone")
         task["timezone_offset"] = lead_info.get("timezone_offset")
         task["timezone_abbr"] = lead_info.get("timezone_abbr")
+        task["timezone_error"] = lead_info.get("timezone_error")
         updated_tasks.append(task)
     return updated_tasks
 
@@ -325,7 +364,12 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                 f"Found {len(st.session_state.tasks)} lead(s) that have that task description to be completed:"
             )
             for task in st.session_state.tasks:
-                st.write(f"- {task['lead_name']}")
+                if task.get("timezone_error"):
+                    st.error(
+                        f"{task['company_name']} - {task['contact_name']} (Timezone Error: {task['timezone_error']})"
+                    )
+                else:
+                    st.write(f"{task['company_name']} - {task['contact_name']}")
 
             # Show meeting length and leads per block inputs after tasks are found
             st.session_state.meeting_length = st.selectbox(
