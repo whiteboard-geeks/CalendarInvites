@@ -574,6 +574,101 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                             )
                         st.write("Please update these blocks and re-run.")
                     else:
+                        # Make entire Available slots section collapsible
+                        with st.expander("### Available slots in placeholder events"):
+                            # Sort placeholder events by start time
+                            placeholder_events = sorted(
+                                placeholder_events,
+                                key=lambda x: x["start"].get(
+                                    "dateTime", x["start"].get("date")
+                                ),
+                            )
+
+                            # Create tabs for each block
+                            tab_labels = []
+                            for event in placeholder_events:
+                                start = event["start"].get(
+                                    "dateTime", event["start"].get("date")
+                                )
+                                end = event["end"].get(
+                                    "dateTime", event["end"].get("date")
+                                )
+                                start_dt = datetime.datetime.fromisoformat(start)
+                                end_dt = datetime.datetime.fromisoformat(end)
+
+                                # Convert to Eastern Time for display
+                                eastern = pytz.timezone("America/New_York")
+                                start_et = start_dt.astimezone(eastern)
+                                end_et = end_dt.astimezone(eastern)
+
+                                # Create tab label with date and time range
+                                tab_label = f"**{start_et.strftime('%A, %B %d')}** {start_et.strftime('%I:%M %p')} - {end_et.strftime('%I:%M %p')} ET"
+                                tab_labels.append(tab_label)
+
+                            # Create tabs
+                            tabs = st.tabs(tab_labels)
+
+                            # Fill each tab with its content
+                            for idx, (tab, event) in enumerate(
+                                zip(tabs, placeholder_events)
+                            ):
+                                with tab:
+                                    start = event["start"].get(
+                                        "dateTime", event["start"].get("date")
+                                    )
+                                    end = event["end"].get(
+                                        "dateTime", event["end"].get("date")
+                                    )
+                                    start_dt = datetime.datetime.fromisoformat(start)
+                                    end_dt = datetime.datetime.fromisoformat(end)
+
+                                    # Calculate number of slots in this placeholder event
+                                    event_duration = (
+                                        end_dt - start_dt
+                                    ).total_seconds() / 60
+                                    num_slots = int(
+                                        event_duration / st.session_state.meeting_length
+                                    )
+
+                                    for slot_index in range(num_slots):
+                                        slot_start = start_dt + datetime.timedelta(
+                                            minutes=slot_index
+                                            * st.session_state.meeting_length
+                                        )
+                                        slot_end = slot_start + datetime.timedelta(
+                                            minutes=st.session_state.meeting_length
+                                        )
+
+                                        # Get existing events in this slot
+                                        existing_events = (
+                                            calendar_utils.get_events_in_range(
+                                                slot_start.isoformat(),
+                                                slot_end.isoformat(),
+                                            )
+                                        )
+
+                                        # Count events that overlap with this slot (excluding placeholder events)
+                                        events_in_slot = len(
+                                            [
+                                                event
+                                                for event in existing_events
+                                                if event["summary"]
+                                                != placeholder_event_name
+                                            ]
+                                        )
+
+                                        # Calculate available slots
+                                        available_slots = (
+                                            st.session_state.leads_per_block
+                                            - events_in_slot
+                                        )
+
+                                        # Display slot time and availability in ET
+                                        slot_start_et = slot_start.astimezone(eastern)
+                                        st.write(
+                                            f"{slot_start_et.strftime('%I:%M %p')} ET - {available_slots} of {st.session_state.leads_per_block} available"
+                                        )
+
                         # Calculate total available capacity considering existing events
                         total_available_slots = 0
                         for event in placeholder_events:
