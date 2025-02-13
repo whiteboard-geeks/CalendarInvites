@@ -969,6 +969,18 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                     )
                                     slot_key = slot_start.isoformat()
 
+                                    # Check if this slot is valid for the lead's timezone
+                                    if task.get("timezone"):
+                                        # Convert slot time to lead's timezone
+                                        lead_tz = pytz.timezone(task["timezone"])
+                                        slot_start_local = slot_start.astimezone(
+                                            lead_tz
+                                        )
+
+                                        # Skip if before 9am in lead's timezone
+                                        if slot_start_local.hour < 9:
+                                            continue
+
                                     # Initialize slot usage if not exists
                                     if slot_key not in st.session_state.slot_usage:
                                         st.session_state.slot_usage[slot_key] = 0
