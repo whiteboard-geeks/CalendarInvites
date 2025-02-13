@@ -437,14 +437,21 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
             st.write(
                 f"Found {len(st.session_state.tasks)} lead(s) that have that task description to be completed:"
             )
-            # First display all tasks, highlighting those with errors
-            for task in st.session_state.tasks:
-                if task.get("timezone_error"):
-                    st.error(
-                        f"{task['company_name']} - {task['contact_name']} (Timezone Error: {task['timezone_error']})"
-                    )
-                else:
-                    st.write(f"{task['company_name']} - {task['contact_name']}")
+            # Check if any tasks have timezone errors
+            has_timezone_errors = any(
+                task.get("timezone_error") for task in st.session_state.tasks
+            )
+
+            # Create expander with auto-expand based on errors
+            with st.expander("View all leads", expanded=has_timezone_errors):
+                # Display all tasks, highlighting those with errors
+                for task in st.session_state.tasks:
+                    if task.get("timezone_error"):
+                        st.error(
+                            f"{task['company_name']} - {task['contact_name']} (Timezone Error: {task['timezone_error']})"
+                        )
+                    else:
+                        st.write(f"{task['company_name']} - {task['contact_name']}")
 
             # Now filter out tasks with timezone errors
             st.session_state.tasks = [
@@ -521,9 +528,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                     st.session_state.tasks
                 )
 
-                # Display timezone distribution
-                st.write("### Leads that must be scheduled after:")
-
                 # Map times to timezones for display
                 schedule_times = {
                     "9am": {"tz": "ET", "count": timezone_counts["ET"]},
@@ -534,15 +538,20 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                     "2pm": {"tz": "HI", "count": timezone_counts["HI"]},
                 }
 
-                # Display each timezone's leads with their scheduling time
-                for time, info in schedule_times.items():
-                    if info["count"] > 0:
-                        st.write(f"- {time} - {info['count']} leads in {info['tz']}")
+                # Display timezone distribution in an expander
+                with st.expander("Timezone Distribution", expanded=False):
+                    st.write("### Leads that must be scheduled after:")
+                    # Display each timezone's leads with their scheduling time
+                    for time, info in schedule_times.items():
+                        if info["count"] > 0:
+                            st.write(
+                                f"- {time} - {info['count']} leads in {info['tz']}"
+                            )
 
-                if timezone_counts["Unknown"] > 0:
-                    st.warning(
-                        f"⚠️ {timezone_counts['Unknown']} leads with unknown timezone"
-                    )
+                    if timezone_counts["Unknown"] > 0:
+                        st.warning(
+                            f"⚠️ {timezone_counts['Unknown']} leads with unknown timezone"
+                        )
 
                 placeholder_events = calendar_utils.find_placeholder_events(
                     placeholder_event_name
