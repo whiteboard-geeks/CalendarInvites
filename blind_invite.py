@@ -3,6 +3,7 @@ import requests
 import base64
 import calendar_utils
 import datetime
+import pytz
 
 
 # Function to search tasks in Close CRM
@@ -81,6 +82,64 @@ def split_contact_name(full_name):
         return f"{name_parts[0]} {name_parts[1]}", name_parts[2]
 
 
+def get_state_timezone(state_code):
+    """Maps US state codes to their primary timezone."""
+    state_timezone_map = {
+        "AL": "America/Chicago",  # Alabama
+        "AK": "America/Anchorage",  # Alaska
+        "AZ": "America/Phoenix",  # Arizona
+        "AR": "America/Chicago",  # Arkansas
+        "CA": "America/Los_Angeles",  # California
+        "CO": "America/Denver",  # Colorado
+        "CT": "America/New_York",  # Connecticut
+        "DE": "America/New_York",  # Delaware
+        "FL": "America/New_York",  # Florida
+        "GA": "America/New_York",  # Georgia
+        "HI": "Pacific/Honolulu",  # Hawaii
+        "ID": "America/Boise",  # Idaho
+        "IL": "America/Chicago",  # Illinois
+        "IN": "America/Indiana/Indianapolis",  # Indiana
+        "IA": "America/Chicago",  # Iowa
+        "KS": "America/Chicago",  # Kansas
+        "KY": "America/New_York",  # Kentucky
+        "LA": "America/Chicago",  # Louisiana
+        "ME": "America/New_York",  # Maine
+        "MD": "America/New_York",  # Maryland
+        "MA": "America/New_York",  # Massachusetts
+        "MI": "America/Detroit",  # Michigan
+        "MN": "America/Chicago",  # Minnesota
+        "MS": "America/Chicago",  # Mississippi
+        "MO": "America/Chicago",  # Missouri
+        "MT": "America/Denver",  # Montana
+        "NE": "America/Chicago",  # Nebraska
+        "NV": "America/Los_Angeles",  # Nevada
+        "NH": "America/New_York",  # New Hampshire
+        "NJ": "America/New_York",  # New Jersey
+        "NM": "America/Denver",  # New Mexico
+        "NY": "America/New_York",  # New York
+        "NC": "America/New_York",  # North Carolina
+        "ND": "America/Chicago",  # North Dakota
+        "OH": "America/New_York",  # Ohio
+        "OK": "America/Chicago",  # Oklahoma
+        "OR": "America/Los_Angeles",  # Oregon
+        "PA": "America/New_York",  # Pennsylvania
+        "RI": "America/New_York",  # Rhode Island
+        "SC": "America/New_York",  # South Carolina
+        "SD": "America/Chicago",  # South Dakota
+        "TN": "America/Chicago",  # Tennessee
+        "TX": "America/Chicago",  # Texas
+        "UT": "America/Denver",  # Utah
+        "VT": "America/New_York",  # Vermont
+        "VA": "America/New_York",  # Virginia
+        "WA": "America/Los_Angeles",  # Washington
+        "WV": "America/New_York",  # West Virginia
+        "WI": "America/Chicago",  # Wisconsin
+        "WY": "America/Denver",  # Wyoming
+        "DC": "America/New_York",  # District of Columbia
+    }
+    return state_timezone_map.get(state_code.upper())
+
+
 def get_lead_info(lead_id, close_api_key):
     encoded_api_key = base64.b64encode(f"{close_api_key}:".encode()).decode()
     url = f"https://api.close.com/api/v1/lead/{lead_id}"
@@ -98,6 +157,22 @@ def get_lead_info(lead_id, close_api_key):
             split_contact_name(contact_name)
         )
         lead_data["contact_email"] = lead_data["contacts"][0]["emails"][0]["email"]
+
+        # Add timezone information based on the lead's state
+        if lead_data.get("addresses") and len(lead_data["addresses"]) > 0:
+            state = lead_data["addresses"][0].get("state")
+            if state:
+                timezone_name = get_state_timezone(state)
+                if timezone_name:
+                    timezone = pytz.timezone(timezone_name)
+                    lead_data["timezone"] = timezone_name
+                    lead_data["timezone_offset"] = datetime.datetime.now(
+                        timezone
+                    ).strftime("%z")
+                    lead_data["timezone_abbr"] = datetime.datetime.now(
+                        timezone
+                    ).strftime("%Z")
+
         return lead_data
     else:
         st.error("Lead fetch failed")
@@ -117,6 +192,10 @@ def append_lead_info_to_tasks(tasks, close_api_key):
         task["contact_lastinitial"] = (
             lead_info["contact_lastname"][0] if lead_info["contact_lastname"] else ""
         )
+        # Add timezone information to task
+        task["timezone"] = lead_info.get("timezone")
+        task["timezone_offset"] = lead_info.get("timezone_offset")
+        task["timezone_abbr"] = lead_info.get("timezone_abbr")
         updated_tasks.append(task)
     return updated_tasks
 
@@ -468,7 +547,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
 
                     # Contact information at the top
                     st.write("### Contact Information")
-                    col1, col2 = st.columns(2)
+                    col1, col2, col3 = st.columns(3)
                     with col1:
                         st.write(
                             f"**Name:** {task['contact_firstname']} {task['contact_lastname']}"
@@ -476,6 +555,13 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                         st.write(f"**Company:** {task['company_name']}")
                     with col2:
                         st.write(f"**Email:** {task['contact_email']}")
+                    with col3:
+                        if task.get("timezone"):
+                            st.write(
+                                f"**Timezone:** {task['timezone_abbr']} ({task['timezone_offset']})"
+                            )
+                        else:
+                            st.write("**Timezone:** Unknown")
 
                     # Send invite button at the top
                     if st.button("Send Invite", key="send_invite"):
