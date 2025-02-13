@@ -640,6 +640,12 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
             st.session_state.tasks = append_lead_info_to_tasks(
                 st.session_state.tasks, close_api_key
             )
+            # Sort tasks by timezone offset, westernmost (most negative) first
+            st.session_state.tasks.sort(
+                key=lambda x: int(x.get("timezone_offset", "0000").replace(":", ""))
+                if x.get("timezone_offset")
+                else 0
+            )
             st.session_state.search_attempted = True
 
     if st.session_state.search_attempted:
@@ -673,9 +679,25 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                 f"\nProceeding with {len(st.session_state.tasks)} error-free leads"
             )
 
+            # Additional check for timezone offsets and sort
+            tasks_with_offsets = []
+            for task in st.session_state.tasks:
+                if not task.get("timezone_offset"):
+                    st.error(
+                        f"Task for {task['company_name']} - {task['contact_name']} missing timezone offset"
+                    )
+                else:
+                    tasks_with_offsets.append(task)
+
+            # Sort by timezone offset, westernmost first
+            tasks_with_offsets.sort(
+                key=lambda x: int(x["timezone_offset"].replace(":", ""))
+            )
+            st.session_state.tasks = tasks_with_offsets
+
             if not st.session_state.tasks:
                 st.error(
-                    "No error-free tasks remaining. Please fix timezone errors and try again."
+                    "No valid tasks remaining. Please fix timezone issues and try again."
                 )
                 return
 
