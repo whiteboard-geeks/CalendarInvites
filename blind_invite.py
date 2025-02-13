@@ -363,6 +363,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
             st.write(
                 f"Found {len(st.session_state.tasks)} lead(s) that have that task description to be completed:"
             )
+            # First display all tasks, highlighting those with errors
             for task in st.session_state.tasks:
                 if task.get("timezone_error"):
                     st.error(
@@ -370,6 +371,22 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                     )
                 else:
                     st.write(f"{task['company_name']} - {task['contact_name']}")
+
+            # Now filter out tasks with timezone errors
+            st.session_state.tasks = [
+                task
+                for task in st.session_state.tasks
+                if not task.get("timezone_error")
+            ]
+            st.write(
+                f"\nProceeding with {len(st.session_state.tasks)} error-free leads"
+            )
+
+            if not st.session_state.tasks:
+                st.error(
+                    "No error-free tasks remaining. Please fix timezone errors and try again."
+                )
+                return
 
             # Show meeting length and leads per block inputs after tasks are found
             st.session_state.meeting_length = st.selectbox(
