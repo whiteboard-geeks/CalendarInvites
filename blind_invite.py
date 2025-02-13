@@ -239,6 +239,80 @@ def append_lead_info_to_tasks(tasks, close_api_key):
     return updated_tasks
 
 
+def analyze_timezone_distribution(tasks):
+    """Analyzes the distribution of leads across timezones and shows required slots by ET time.
+
+    Shows how many slots are needed at each ET time based on timezone constraints:
+    - 9am ET: ET leads
+    - 10am ET: ET + CT leads
+    - 11am ET: ET + CT + MT leads
+    - 12pm ET: ET + CT + MT + PT leads
+    - 1pm ET: ET + CT + MT + PT + AK leads
+    - 2pm ET: ET + CT + MT + PT + AK + HI leads
+    """
+    # Initialize timezone counters
+    timezone_counts = {
+        "ET": 0,
+        "CT": 0,
+        "MT": 0,
+        "PT": 0,
+        "AK": 0,
+        "HI": 0,
+        "Unknown": 0,
+    }
+
+    # Map timezone names to our simplified categories
+    timezone_mapping = {
+        "America/New_York": "ET",
+        "America/Indiana/Indianapolis": "ET",
+        "America/Detroit": "ET",
+        "America/Chicago": "CT",
+        "America/Denver": "MT",
+        "America/Phoenix": "MT",
+        "America/Boise": "MT",
+        "America/Los_Angeles": "PT",
+        "America/Anchorage": "AK",
+        "Pacific/Honolulu": "HI",
+    }
+
+    # Count leads in each timezone
+    for task in tasks:
+        timezone = task.get("timezone")
+        if not timezone:
+            timezone_counts["Unknown"] += 1
+            continue
+
+        # Map the timezone to our simplified category
+        category = timezone_mapping.get(timezone, "Unknown")
+        timezone_counts[category] += 1
+
+    # Calculate cumulative slots needed at each ET time
+    slots_needed = {
+        "9am ET": timezone_counts["ET"],
+        "10am ET": timezone_counts["ET"] + timezone_counts["CT"],
+        "11am ET": timezone_counts["ET"]
+        + timezone_counts["CT"]
+        + timezone_counts["MT"],
+        "12pm ET": timezone_counts["ET"]
+        + timezone_counts["CT"]
+        + timezone_counts["MT"]
+        + timezone_counts["PT"],
+        "1pm ET": timezone_counts["ET"]
+        + timezone_counts["CT"]
+        + timezone_counts["MT"]
+        + timezone_counts["PT"]
+        + timezone_counts["AK"],
+        "2pm ET": timezone_counts["ET"]
+        + timezone_counts["CT"]
+        + timezone_counts["MT"]
+        + timezone_counts["PT"]
+        + timezone_counts["AK"]
+        + timezone_counts["HI"],
+    }
+
+    return timezone_counts, slots_needed
+
+
 def main():
     st.set_page_config(page_title="Auto Calendar Invites")
 
@@ -441,6 +515,34 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                 # Reset invite state when finding new slots
                 st.session_state.invites_sent = False
                 st.session_state.create_invites_clicked = False
+
+                # Analyze timezone distribution first
+                timezone_counts, slots_needed = analyze_timezone_distribution(
+                    st.session_state.tasks
+                )
+
+                # Display timezone distribution
+                st.write("### Leads that must be scheduled after:")
+
+                # Map times to timezones for display
+                schedule_times = {
+                    "9am": {"tz": "ET", "count": timezone_counts["ET"]},
+                    "10am": {"tz": "CT", "count": timezone_counts["CT"]},
+                    "11am": {"tz": "MT", "count": timezone_counts["MT"]},
+                    "12pm": {"tz": "PT", "count": timezone_counts["PT"]},
+                    "1pm": {"tz": "AK", "count": timezone_counts["AK"]},
+                    "2pm": {"tz": "HI", "count": timezone_counts["HI"]},
+                }
+
+                # Display each timezone's leads with their scheduling time
+                for time, info in schedule_times.items():
+                    if info["count"] > 0:
+                        st.write(f"- {time} - {info['count']} leads in {info['tz']}")
+
+                if timezone_counts["Unknown"] > 0:
+                    st.warning(
+                        f"⚠️ {timezone_counts['Unknown']} leads with unknown timezone"
+                    )
 
                 placeholder_events = calendar_utils.find_placeholder_events(
                     placeholder_event_name
