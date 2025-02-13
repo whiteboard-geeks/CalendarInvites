@@ -313,6 +313,216 @@ def analyze_timezone_distribution(tasks):
     return timezone_counts, slots_needed
 
 
+def process_placeholder_slots(
+    tasks, placeholder_event_name, meeting_length, leads_per_block
+):
+    """Process and analyze placeholder slots.
+
+    Args:
+        tasks: List of tasks to process
+        placeholder_event_name: Name of placeholder events to search for
+        meeting_length: Length of each meeting in minutes
+        leads_per_block: Number of leads that can be scheduled in each time slot
+
+    Returns:
+        dict: Contains all the processed data needed for display, including:
+            - timezone_counts: Count of leads in each timezone
+            - slots_needed: Slots needed at each time
+            - schedule_times: Mapping of times to timezones
+            - placeholder_events: List of placeholder events found
+            - total_available_slots: Total number of available slots
+            - available_slots: Available slots at each time
+            - all_timezones_satisfied: Whether all timezone requirements are met
+            - table_data: Formatted data for display
+            - slot_availability: Detailed availability for each slot
+    """
+    # Reset invite state when finding new slots
+    st.session_state.invites_sent = False
+    st.session_state.create_invites_clicked = False
+
+    # Analyze timezone distribution first
+    timezone_counts, slots_needed = analyze_timezone_distribution(tasks)
+
+    # Map times to timezones for display
+    schedule_times = {
+        "9am": {"tz": "ET", "count": timezone_counts["ET"]},
+        "10am": {"tz": "CT", "count": timezone_counts["CT"]},
+        "11am": {"tz": "MT", "count": timezone_counts["MT"]},
+        "12pm": {"tz": "PT", "count": timezone_counts["PT"]},
+        "1pm": {"tz": "AK", "count": timezone_counts["AK"]},
+        "2pm": {"tz": "HI", "count": timezone_counts["HI"]},
+    }
+
+    # Get placeholder events
+    placeholder_events = calendar_utils.find_placeholder_events(placeholder_event_name)
+    if not placeholder_events:
+        return {
+            "timezone_counts": timezone_counts,
+            "slots_needed": slots_needed,
+            "schedule_times": schedule_times,
+            "placeholder_events": None,
+        }
+
+    # Sort placeholder events by start time
+    placeholder_events = sorted(
+        placeholder_events,
+        key=lambda x: x["start"].get("dateTime", x["start"].get("date")),
+    )
+
+    # Check each event duration
+    insufficient_blocks = []
+    total_event_time = 0
+    for event in placeholder_events:
+        start = event["start"].get("dateTime", event["start"].get("date"))
+        end = event["end"].get("dateTime", event["end"].get("date"))
+        start_dt = datetime.datetime.fromisoformat(start)
+        end_dt = datetime.datetime.fromisoformat(end)
+        duration = (end_dt - start_dt).total_seconds() / 60  # duration in minutes
+        total_event_time += duration
+
+        if duration < meeting_length:
+            insufficient_blocks.append(event)
+
+    if insufficient_blocks:
+        return {
+            "timezone_counts": timezone_counts,
+            "slots_needed": slots_needed,
+            "schedule_times": schedule_times,
+            "placeholder_events": placeholder_events,
+            "insufficient_blocks": insufficient_blocks,
+        }
+
+    # Calculate total available capacity considering existing events
+    total_available_slots = 0
+
+    # First calculate total slots available at each hour
+    slots_at_hour = {
+        14: 0,  # 2pm
+        13: 0,  # 1pm
+        12: 0,  # 12pm
+        11: 0,  # 11am
+        10: 0,  # 10am
+        9: 0,  # 9am
+    }
+
+    # Process each event and calculate slot availability
+    slot_availability = []
+    for event in placeholder_events:
+        start = event["start"].get("dateTime", event["start"].get("date"))
+        end = event["end"].get("dateTime", event["end"].get("date"))
+        start_dt = datetime.datetime.fromisoformat(start)
+        end_dt = datetime.datetime.fromisoformat(end)
+
+        num_slots = int((end_dt - start_dt).total_seconds() / 60 / meeting_length)
+        event_slots = []
+
+        for slot_index in range(num_slots):
+            slot_start = start_dt + datetime.timedelta(
+                minutes=slot_index * meeting_length
+            )
+            slot_end = slot_start + datetime.timedelta(minutes=meeting_length)
+
+            # Get existing events in this slot
+            existing_events = calendar_utils.get_events_in_range(
+                slot_start.isoformat(),
+                slot_end.isoformat(),
+            )
+
+            # Count non-placeholder events
+            events_in_slot = len(
+                [
+                    event
+                    for event in existing_events
+                    if event["summary"] != placeholder_event_name
+                ]
+            )
+
+            # Calculate available slots in this time slot
+            available_in_slot = max(0, leads_per_block - events_in_slot)
+            total_available_slots += available_in_slot
+
+            # Add to the appropriate hour bucket
+            slot_start_et = slot_start.astimezone(pytz.timezone("America/New_York"))
+            hour_et = slot_start_et.hour
+            if hour_et in slots_at_hour:
+                slots_at_hour[hour_et] += available_in_slot
+
+            # Store slot availability for display
+            event_slots.append(
+                {
+                    "start": slot_start_et,
+                    "available": available_in_slot,
+                    "total": leads_per_block,
+                }
+            )
+
+        slot_availability.append({"event": event, "slots": event_slots})
+
+    # Now allocate slots to each timezone requirement
+    time_to_hour = {
+        "2pm": 14,
+        "1pm": 13,
+        "12pm": 12,
+        "11am": 11,
+        "10am": 10,
+        "9am": 9,
+    }
+
+    # Start with latest time first
+    unallocated_slots = dict(slots_at_hour)  # Copy of available slots
+    available_slots = {}
+    for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
+        hour = time_to_hour[time]
+        leads_needed = timezone_counts[schedule_times[time]["tz"]]
+
+        # Calculate total available slots at or after this hour
+        slots_available = sum(
+            unallocated_slots[h] for h in unallocated_slots if h >= hour
+        )
+
+        # Record available slots for this time
+        available_slots[time] = slots_available
+
+        # Remove the slots we need for this timezone from available slots,
+        # starting with the earliest possible time for this timezone
+        slots_to_allocate = min(leads_needed, slots_available)
+        for h in sorted(unallocated_slots.keys()):
+            if h >= hour and slots_to_allocate > 0:
+                allocated = min(slots_to_allocate, unallocated_slots[h])
+                unallocated_slots[h] -= allocated
+                slots_to_allocate -= allocated
+
+    # Create table rows
+    table_data = []
+    all_timezones_satisfied = True
+    for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
+        leads = timezone_counts[schedule_times[time]["tz"]]
+        available = available_slots[time]
+        status = "✅" if available >= leads else "⛔"
+        if status == "⛔":
+            all_timezones_satisfied = False
+        table_data.append(
+            {
+                "Time (ET) or later": time,
+                "Leads to Schedule": leads,
+                "Available Slots": available,
+                "Status": status,
+            }
+        )
+
+    return {
+        "timezone_counts": timezone_counts,
+        "slots_needed": slots_needed,
+        "schedule_times": schedule_times,
+        "placeholder_events": placeholder_events,
+        "total_available_slots": total_available_slots,
+        "available_slots": available_slots,
+        "all_timezones_satisfied": all_timezones_satisfied,
+        "table_data": table_data,
+        "slot_availability": slot_availability,
+    }
+
+
 def main():
     st.set_page_config(page_title="Auto Calendar Invites")
 
@@ -519,401 +729,97 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                 st.session_state.prev_placeholder_name = placeholder_event_name
 
             if st.button("Find Placeholder Slots"):
-                # Reset invite state when finding new slots
-                st.session_state.invites_sent = False
-                st.session_state.create_invites_clicked = False
+                # All computation in the spinner
+                with st.spinner("Finding and analyzing available slots..."):
+                    result = process_placeholder_slots(
+                        st.session_state.tasks,
+                        placeholder_event_name,
+                        st.session_state.meeting_length,
+                        st.session_state.leads_per_block,
+                    )
 
-                # Analyze timezone distribution first
-                timezone_counts, slots_needed = analyze_timezone_distribution(
-                    st.session_state.tasks
-                )
+                # All display code after the spinner
+                if not result["placeholder_events"]:
+                    st.write("No 'Placeholder' slots found.")
+                    return
 
-                # Map times to timezones for display
-                schedule_times = {
-                    "9am": {"tz": "ET", "count": timezone_counts["ET"]},
-                    "10am": {"tz": "CT", "count": timezone_counts["CT"]},
-                    "11am": {"tz": "MT", "count": timezone_counts["MT"]},
-                    "12pm": {"tz": "PT", "count": timezone_counts["PT"]},
-                    "1pm": {"tz": "AK", "count": timezone_counts["AK"]},
-                    "2pm": {"tz": "HI", "count": timezone_counts["HI"]},
-                }
+                if "insufficient_blocks" in result:
+                    st.write("The following blocks are not long enough:")
+                    for block in result["insufficient_blocks"]:
+                        st.write(
+                            f"- {block['summary']} from {block['start']} to {block['end']}"
+                        )
+                    st.write("Please update these blocks and re-run.")
+                    return
 
                 # Display timezone distribution in an expander
                 with st.expander("Timezone Distribution", expanded=False):
                     st.write("### Leads that must be scheduled after:")
                     # Display each timezone's leads with their scheduling time
-                    for time, info in schedule_times.items():
+                    for time, info in result["schedule_times"].items():
                         if info["count"] > 0:
                             st.write(
                                 f"- {time} - {info['count']} leads in {info['tz']}"
                             )
 
-                    if timezone_counts["Unknown"] > 0:
+                    if result["timezone_counts"]["Unknown"] > 0:
                         st.warning(
-                            f"⚠️ {timezone_counts['Unknown']} leads with unknown timezone"
+                            f"⚠️ {result['timezone_counts']['Unknown']} leads with unknown timezone"
                         )
 
-                placeholder_events = calendar_utils.find_placeholder_events(
-                    placeholder_event_name
-                )
-                if placeholder_events:
-                    # Check each event duration
-                    insufficient_blocks = []
-                    total_event_time = 0
-                    for event in placeholder_events:
+                # Make entire Available slots section collapsible
+                with st.expander("### Available slots in placeholder events"):
+                    # Create tabs for each block
+                    tab_labels = []
+                    for event_data in result["slot_availability"]:
+                        event = event_data["event"]
                         start = event["start"].get(
                             "dateTime", event["start"].get("date")
                         )
                         end = event["end"].get("dateTime", event["end"].get("date"))
                         start_dt = datetime.datetime.fromisoformat(start)
                         end_dt = datetime.datetime.fromisoformat(end)
-                        duration = (
-                            end_dt - start_dt
-                        ).total_seconds() / 60  # duration in minutes
-                        total_event_time += duration
 
-                        if duration < st.session_state.meeting_length:
-                            insufficient_blocks.append(event)
+                        # Convert to Eastern Time for display
+                        eastern = pytz.timezone("America/New_York")
+                        start_et = start_dt.astimezone(eastern)
+                        end_et = end_dt.astimezone(eastern)
 
-                    if insufficient_blocks:
-                        st.write("The following blocks are not long enough:")
-                        for block in insufficient_blocks:
-                            st.write(
-                                f"- {block['summary']} from {block['start']} to {block['end']}"
-                            )
-                        st.write("Please update these blocks and re-run.")
-                    else:
-                        # Make entire Available slots section collapsible
-                        with st.expander("### Available slots in placeholder events"):
-                            # Sort placeholder events by start time
-                            placeholder_events = sorted(
-                                placeholder_events,
-                                key=lambda x: x["start"].get(
-                                    "dateTime", x["start"].get("date")
-                                ),
-                            )
+                        # Create tab label with date and time range
+                        tab_label = f"**{start_et.strftime('%A, %B %d')}** {start_et.strftime('%I:%M %p')} - {end_et.strftime('%I:%M %p')} ET"
+                        tab_labels.append(tab_label)
 
-                            # Create tabs for each block
-                            tab_labels = []
-                            for event in placeholder_events:
-                                start = event["start"].get(
-                                    "dateTime", event["start"].get("date")
-                                )
-                                end = event["end"].get(
-                                    "dateTime", event["end"].get("date")
-                                )
-                                start_dt = datetime.datetime.fromisoformat(start)
-                                end_dt = datetime.datetime.fromisoformat(end)
+                    # Create tabs
+                    tabs = st.tabs(tab_labels)
 
-                                # Convert to Eastern Time for display
-                                eastern = pytz.timezone("America/New_York")
-                                start_et = start_dt.astimezone(eastern)
-                                end_et = end_dt.astimezone(eastern)
-
-                                # Create tab label with date and time range
-                                tab_label = f"**{start_et.strftime('%A, %B %d')}** {start_et.strftime('%I:%M %p')} - {end_et.strftime('%I:%M %p')} ET"
-                                tab_labels.append(tab_label)
-
-                            # Create tabs
-                            tabs = st.tabs(tab_labels)
-
-                            # Fill each tab with its content
-                            for idx, (tab, event) in enumerate(
-                                zip(tabs, placeholder_events)
-                            ):
-                                with tab:
-                                    start = event["start"].get(
-                                        "dateTime", event["start"].get("date")
-                                    )
-                                    end = event["end"].get(
-                                        "dateTime", event["end"].get("date")
-                                    )
-                                    start_dt = datetime.datetime.fromisoformat(start)
-                                    end_dt = datetime.datetime.fromisoformat(end)
-
-                                    # Calculate number of slots in this placeholder event
-                                    event_duration = (
-                                        end_dt - start_dt
-                                    ).total_seconds() / 60
-                                    num_slots = int(
-                                        event_duration / st.session_state.meeting_length
-                                    )
-
-                                    for slot_index in range(num_slots):
-                                        slot_start = start_dt + datetime.timedelta(
-                                            minutes=slot_index
-                                            * st.session_state.meeting_length
-                                        )
-                                        slot_end = slot_start + datetime.timedelta(
-                                            minutes=st.session_state.meeting_length
-                                        )
-
-                                        # Get existing events in this slot
-                                        existing_events = (
-                                            calendar_utils.get_events_in_range(
-                                                slot_start.isoformat(),
-                                                slot_end.isoformat(),
-                                            )
-                                        )
-
-                                        # Count events that overlap with this slot (excluding placeholder events)
-                                        events_in_slot = len(
-                                            [
-                                                event
-                                                for event in existing_events
-                                                if event["summary"]
-                                                != placeholder_event_name
-                                            ]
-                                        )
-
-                                        # Calculate available slots
-                                        available_slots = (
-                                            st.session_state.leads_per_block
-                                            - events_in_slot
-                                        )
-
-                                        # Display slot time and availability in ET
-                                        slot_start_et = slot_start.astimezone(eastern)
-                                        st.write(
-                                            f"{slot_start_et.strftime('%I:%M %p')} ET - {available_slots} of {st.session_state.leads_per_block} available"
-                                        )
-
-                        # Calculate total available capacity considering existing events
-                        total_available_slots = 0
-                        slots_by_time = {
-                            "2pm": 0,
-                            "1pm": 0,
-                            "12pm": 0,
-                            "11am": 0,
-                            "10am": 0,
-                            "9am": 0,
-                        }
-
-                        for event in placeholder_events:
-                            start = event["start"].get(
-                                "dateTime", event["start"].get("date")
-                            )
-                            end = event["end"].get("dateTime", event["end"].get("date"))
-                            start_dt = datetime.datetime.fromisoformat(start)
-                            end_dt = datetime.datetime.fromisoformat(end)
-
-                            # Calculate number of slots in this placeholder event
-                            event_duration = (end_dt - start_dt).total_seconds() / 60
-                            num_slots = int(
-                                event_duration / st.session_state.meeting_length
-                            )
-
-                            # Check each slot's availability
-                            for slot_index in range(num_slots):
-                                slot_start = start_dt + datetime.timedelta(
-                                    minutes=slot_index * st.session_state.meeting_length
-                                )
-                                slot_end = slot_start + datetime.timedelta(
-                                    minutes=st.session_state.meeting_length
+                    # Fill each tab with its content
+                    for idx, (tab, event_data) in enumerate(
+                        zip(tabs, result["slot_availability"])
+                    ):
+                        with tab:
+                            for slot in event_data["slots"]:
+                                slot_start_et = slot["start"]
+                                st.write(
+                                    f"{slot_start_et.strftime('%I:%M %p')} ET - {slot['available']} of {slot['total']} available"
                                 )
 
-                                # Get existing events in this slot
-                                existing_events = calendar_utils.get_events_in_range(
-                                    slot_start.isoformat(),
-                                    slot_end.isoformat(),
-                                )
+                # Display timezone requirements analysis
+                st.write("\n### Timezone Requirements Analysis")
+                st.table(result["table_data"])
 
-                                # Count events that overlap with this slot (excluding placeholder events)
-                                events_in_slot = len(
-                                    [
-                                        event
-                                        for event in existing_events
-                                        if event["summary"] != placeholder_event_name
-                                    ]
-                                )
-
-                                # Add available capacity in this slot
-                                available_in_slot = max(
-                                    0, st.session_state.leads_per_block - events_in_slot
-                                )
-                                total_available_slots += available_in_slot
-
-                                # Convert slot time to ET for categorization
-                                slot_start_et = slot_start.astimezone(
-                                    pytz.timezone("America/New_York")
-                                )
-                                hour_et = slot_start_et.hour
-                                # Add this slot to all applicable time buckets
-                                if hour_et >= 14:  # 2pm ET or later
-                                    slots_by_time["2pm"] += available_in_slot
-                                if hour_et >= 13:  # 1pm ET or later
-                                    slots_by_time["1pm"] += available_in_slot
-                                if hour_et >= 12:  # 12pm ET or later
-                                    slots_by_time["12pm"] += available_in_slot
-                                if hour_et >= 11:  # 11am ET or later
-                                    slots_by_time["11am"] += available_in_slot
-                                if hour_et >= 10:  # 10am ET or later
-                                    slots_by_time["10am"] += available_in_slot
-                                if hour_et >= 9:  # 9am ET or later
-                                    slots_by_time["9am"] += available_in_slot
-
-                        # Create cumulative slot counts (later times include earlier slots)
-                        cumulative_slots = {}
-                        running_total = 0
-                        for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
-                            running_total += slots_by_time[time]
-                            cumulative_slots[time] = running_total
-
-                        # Create timezone requirements table
-                        st.write("\n### Timezone Requirements Analysis")
-
-                        # Create data for the table
-                        table_data = []
-                        timezone_leads = {
-                            "2pm": timezone_counts["HI"],
-                            "1pm": timezone_counts["AK"],
-                            "12pm": timezone_counts["PT"],
-                            "11am": timezone_counts["MT"],
-                            "10am": timezone_counts["CT"],
-                            "9am": timezone_counts["ET"],
-                        }
-
-                        # Track if we have enough slots for all timezones
-                        all_timezones_satisfied = True
-
-                        # Calculate available slots for each time requirement
-                        available_slots = {}
-
-                        # First calculate total slots available at each hour
-                        slots_at_hour = {
-                            14: 0,  # 2pm
-                            13: 0,  # 1pm
-                            12: 0,  # 12pm
-                            11: 0,  # 11am
-                            10: 0,  # 10am
-                            9: 0,  # 9am
-                        }
-
-                        # Count available slots at each hour from the placeholder events
-                        for event in placeholder_events:
-                            start = event["start"].get(
-                                "dateTime", event["start"].get("date")
-                            )
-                            end = event["end"].get("dateTime", event["end"].get("date"))
-                            start_dt = datetime.datetime.fromisoformat(start)
-                            end_dt = datetime.datetime.fromisoformat(end)
-
-                            num_slots = int(
-                                (end_dt - start_dt).total_seconds()
-                                / 60
-                                / st.session_state.meeting_length
-                            )
-
-                            for slot_index in range(num_slots):
-                                slot_start = start_dt + datetime.timedelta(
-                                    minutes=slot_index * st.session_state.meeting_length
-                                )
-                                slot_end = slot_start + datetime.timedelta(
-                                    minutes=st.session_state.meeting_length
-                                )
-
-                                # Get existing events in this slot
-                                existing_events = calendar_utils.get_events_in_range(
-                                    slot_start.isoformat(),
-                                    slot_end.isoformat(),
-                                )
-
-                                # Count non-placeholder events
-                                events_in_slot = len(
-                                    [
-                                        event
-                                        for event in existing_events
-                                        if event["summary"] != placeholder_event_name
-                                    ]
-                                )
-
-                                # Calculate available slots in this time slot
-                                available_in_slot = max(
-                                    0, st.session_state.leads_per_block - events_in_slot
-                                )
-
-                                # Add to the appropriate hour bucket
-                                slot_start_et = slot_start.astimezone(
-                                    pytz.timezone("America/New_York")
-                                )
-                                hour_et = slot_start_et.hour
-                                if hour_et in slots_at_hour:
-                                    slots_at_hour[hour_et] += available_in_slot
-
-                        # Now allocate slots to each timezone requirement
-                        time_to_hour = {
-                            "2pm": 14,
-                            "1pm": 13,
-                            "12pm": 12,
-                            "11am": 11,
-                            "10am": 10,
-                            "9am": 9,
-                        }
-
-                        # Start with latest time first
-                        unallocated_slots = dict(
-                            slots_at_hour
-                        )  # Copy of available slots
-                        for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
-                            hour = time_to_hour[time]
-                            leads_needed = timezone_leads[time]
-
-                            # Calculate total available slots at or after this hour
-                            slots_available = sum(
-                                unallocated_slots[h]
-                                for h in unallocated_slots
-                                if h >= hour
-                            )
-
-                            # Record available slots for this time
-                            available_slots[time] = slots_available
-
-                            # Remove the slots we need for this timezone from available slots,
-                            # starting with the earliest possible time for this timezone
-                            slots_to_allocate = min(leads_needed, slots_available)
-                            for h in sorted(unallocated_slots.keys()):
-                                if h >= hour and slots_to_allocate > 0:
-                                    allocated = min(
-                                        slots_to_allocate, unallocated_slots[h]
-                                    )
-                                    unallocated_slots[h] -= allocated
-                                    slots_to_allocate -= allocated
-
-                        # Create table rows
-                        for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
-                            leads = timezone_leads[time]
-                            available = available_slots[time]
-                            status = "✅" if available >= leads else "⛔"
-                            if status == "⛔":
-                                all_timezones_satisfied = False
-                            table_data.append(
-                                {
-                                    "Time (ET) or later": time,
-                                    "Leads to Schedule": leads,
-                                    "Available Slots": available,
-                                    "Status": status,
-                                }
-                            )
-
-                        # Display as a Streamlit table
-                        st.table(table_data)
-
-                        # Check if we have enough total capacity
-                        if total_available_slots < len(st.session_state.tasks):
-                            st.write(
-                                f"Not enough available capacity in the placeholder slots. Need {len(st.session_state.tasks)} slots but only have {total_available_slots} available after accounting for existing events."
-                            )
-                        elif not all_timezones_satisfied:
-                            st.write(
-                                "⚠️ Some timezone requirements cannot be met with current slot distribution"
-                            )
-                        else:
-                            st.write("✅ Time looks good")
-                            st.session_state.time_looks_good = True
-                            st.session_state.placeholder_events = placeholder_events
-
+                # Check if we have enough total capacity
+                if result["total_available_slots"] < len(st.session_state.tasks):
+                    st.write(
+                        f"Not enough available capacity in the placeholder slots. Need {len(st.session_state.tasks)} slots but only have {result['total_available_slots']} available after accounting for existing events."
+                    )
+                elif not result["all_timezones_satisfied"]:
+                    st.write(
+                        "⚠️ Some timezone requirements cannot be met with current slot distribution"
+                    )
                 else:
-                    st.write("No 'Placeholder' slots found.")
+                    st.write("✅ Time looks good")
+                    st.session_state.time_looks_good = True
+                    st.session_state.placeholder_events = result["placeholder_events"]
 
             if st.session_state.get("time_looks_good", False):
                 # Add template fields for event customization
