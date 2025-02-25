@@ -449,6 +449,21 @@ def process_placeholder_slots(
             "placeholder_events": None,
         }
 
+    # Filter to only include events with the exact name matching the placeholder_event_name
+    placeholder_events = [
+        event
+        for event in placeholder_events
+        if event.get("summary") == placeholder_event_name
+    ]
+
+    if not placeholder_events:
+        return {
+            "timezone_counts": timezone_counts,
+            "slots_needed": slots_needed,
+            "schedule_times": schedule_times,
+            "placeholder_events": None,
+        }
+
     # Sort placeholder events by start time
     placeholder_events = sorted(
         placeholder_events,
@@ -499,7 +514,10 @@ def process_placeholder_slots(
         start_dt = datetime.datetime.fromisoformat(start)
         end_dt = datetime.datetime.fromisoformat(end)
 
-        num_slots = int((end_dt - start_dt).total_seconds() / 60 / meeting_length)
+        # Calculate number of complete slots that fit within the event duration
+        # Use floor division to ensure we don't include a partial slot at the end
+        duration_minutes = (end_dt - start_dt).total_seconds() / 60
+        num_slots = int(duration_minutes // meeting_length)
         event_slots = []
 
         for slot_index in range(num_slots):
@@ -507,6 +525,10 @@ def process_placeholder_slots(
                 minutes=slot_index * meeting_length
             )
             slot_end = slot_start + datetime.timedelta(minutes=meeting_length)
+
+            # Skip this slot if it extends beyond the event end time
+            if slot_end > end_dt:
+                continue
 
             # Get existing events in this slot
             existing_events = calendar_utils.get_events_in_range(
@@ -896,7 +918,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                         end_et = end_dt.astimezone(eastern)
 
                         # Create tab label with date and time range
-                        tab_label = f"**{start_et.strftime('%A, %B %d')}** {start_et.strftime('%I:%M %p')} - {end_et.strftime('%I:%M %p')} ET"
+                        tab_label = f"**{placeholder_event_name}:** {start_et.strftime('%A, %B %d')} {start_et.strftime('%I:%M %p')} - {end_et.strftime('%I:%M %p')} ET"
                         tab_labels.append(tab_label)
 
                     # Create tabs
