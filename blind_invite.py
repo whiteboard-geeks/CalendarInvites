@@ -3,7 +3,47 @@ import requests
 import base64
 import calendar_utils
 import datetime
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    retry_if_result,
+)
 import pytz
+
+
+# Configure retry decorator for Close API calls
+def is_rate_limit_error(response):
+    """Check if response indicates a rate limit (HTTP 429)"""
+    return response.status_code == 429
+
+
+@retry(
+    retry=(
+        retry_if_exception_type(requests.exceptions.RequestException)
+        | retry_if_result(is_rate_limit_error)
+    ),
+    stop=stop_after_attempt(5),  # Initial attempt + 4 retries
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    before_sleep=lambda retry_state: st.warning(
+        f"Rate limited or connection error. Retrying in {retry_state.next_action.sleep} seconds..."
+    ),
+)
+def make_close_api_request(url, headers, params):
+    """Make a request to Close API with retry logic"""
+    response = requests.get(url, headers=headers, params=params)
+
+    # If it's a rate limit, return the response which will trigger a retry
+    if response.status_code == 429:
+        return response
+
+    # For other error codes, raise an exception
+    if response.status_code != 200:
+        st.error(f"API request failed with status code {response.status_code}")
+        raise requests.exceptions.HTTPError(f"Status code: {response.status_code}")
+
+    return response
 
 
 # Function to search tasks in Close CRM
@@ -20,19 +60,45 @@ def search_tasks_in_close(task_search, close_api_key):
         "_type": "lead",  # Assuming you want to search lead tasks
         "is_complete": False,
         "view": "inbox",
+        "_limit": 100,  # Set a reasonable limit per page
+        "_skip": 0,  # Start with first page
     }
-    response = requests.get(url, headers=headers, params=params)
 
-    if response.status_code == 200:
-        tasks = response.json().get("data", [])
-        # Filter tasks based on the task_search string
-        filtered_tasks = [
-            task for task in tasks if task_search.lower() in task["text"].lower()
-        ]
-        return filtered_tasks
-    else:
-        st.error("Task fetch failed")
-        return []
+    all_filtered_tasks = []
+    has_more = True
+
+    # Continue fetching while there are more results
+    while has_more:
+        try:
+            # Use our retry-enabled request function
+            response = make_close_api_request(url, headers, params)
+
+            # Process successful response
+            response_data = response.json()
+            page_tasks = response_data.get("data", [])
+
+            # Filter tasks based on the task_search string
+            filtered_page_tasks = [
+                task
+                for task in page_tasks
+                if task_search.lower() in task["text"].lower()
+            ]
+
+            # Add filtered tasks from this page to our results
+            all_filtered_tasks.extend(filtered_page_tasks)
+
+            # Check if there are more pages
+            has_more = response_data.get("has_more", False)
+
+            # Update skip parameter for next page
+            if has_more:
+                params["_skip"] += params["_limit"]
+
+        except Exception as e:
+            st.error(f"Failed to fetch tasks after maximum retries: {str(e)}")
+            break
+
+    return all_filtered_tasks
 
 
 def mark_task_complete_in_close(task_id, close_api_key):
@@ -148,94 +214,114 @@ def get_lead_info(lead_id, close_api_key):
         "Content-Type": "application/json",
     }
     try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()  # This will raise an exception for HTTP errors
-
-        if response.status_code == 200:
-            lead_data = response.json()
-
-            # Check if lead has contacts
-            if not lead_data.get("contacts") or len(lead_data["contacts"]) == 0:
-                st.error(f"Lead {lead_id} has no contacts")
-                return None
-
-            # Check if contact has a name
-            contact = lead_data["contacts"][0]
-            if not contact.get("name"):
-                st.error(f"Contact in lead {lead_id} has no name")
-                return None
-
-            # Check if contact has an email
-            if not contact.get("emails") or len(contact["emails"]) == 0:
-                st.error(f"Contact in lead {lead_id} has no email")
-                return None
-
-            lead_data["company_name"] = lead_data["name"].split("-")[0]
-            contact_name = contact["name"]
-            lead_data["contact_name"] = contact_name
-            lead_data["contact_firstname"], lead_data["contact_lastname"] = (
-                split_contact_name(contact_name)
-            )
-            lead_data["contact_email"] = contact["emails"][0]["email"]
-
-            # Initialize timezone information
-            lead_data["timezone"] = None
-            lead_data["timezone_offset"] = None
-            lead_data["timezone_abbr"] = None
-            lead_data["timezone_error"] = None
-
-            # Add timezone information based on the lead's state if available
-            if lead_data.get("addresses") and len(lead_data["addresses"]) > 0:
-                state = lead_data["addresses"][0].get("state")
-                if state:
-                    timezone_name = get_state_timezone(state)
-                    if timezone_name:
-                        timezone = pytz.timezone(timezone_name)
-                        lead_data["timezone"] = timezone_name
-                        lead_data["timezone_offset"] = datetime.datetime.now(
-                            timezone
-                        ).strftime("%z")
-                        lead_data["timezone_abbr"] = datetime.datetime.now(
-                            timezone
-                        ).strftime("%Z")
-                    else:
-                        lead_data["timezone_error"] = f"Unknown state code: {state}"
-                else:
-                    lead_data["timezone_error"] = "No state found in address"
-            else:
-                lead_data["timezone_error"] = "No address found"
-
-            return lead_data
+        # Use the existing retry-enabled function instead of a direct request
+        response = make_close_api_request(url, headers, {})
+        lead_data = response.json()
+        lead_data["company_name"] = lead_data["name"].split("-")[0]
+        contact_name = lead_data["contacts"][0]["name"]
+        lead_data["contact_name"] = contact_name
+        lead_data["contact_firstname"], lead_data["contact_lastname"] = (
+            split_contact_name(contact_name)
+        )
+        # Check if contact has any emails before trying to access them
+        contact_emails = lead_data["contacts"][0]["emails"]
+        if contact_emails:
+            lead_data["contact_email"] = contact_emails[0]["email"]
         else:
-            st.error(f"Lead fetch failed with status code {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to fetch lead {lead_id}: {str(e)}")
+            lead_data["contact_email"] = None
+
+        # Initialize timezone information
+        lead_data["timezone"] = None
+        lead_data["timezone_offset"] = None
+        lead_data["timezone_abbr"] = None
+        lead_data["timezone_error"] = None
+
+        # Add timezone information based on the lead's state if available
+        if lead_data.get("addresses") and len(lead_data["addresses"]) > 0:
+            state = lead_data["addresses"][0].get("state")
+            if state:
+                timezone_name = get_state_timezone(state)
+                if timezone_name:
+                    timezone = pytz.timezone(timezone_name)
+                    lead_data["timezone"] = timezone_name
+                    lead_data["timezone_offset"] = datetime.datetime.now(
+                        timezone
+                    ).strftime("%z")
+                    lead_data["timezone_abbr"] = datetime.datetime.now(
+                        timezone
+                    ).strftime("%Z")
+                else:
+                    lead_data["timezone_error"] = f"Unknown state code: {state}"
+            else:
+                lead_data["timezone_error"] = "No state found in address"
+        else:
+            lead_data["timezone_error"] = "No address found"
+
+        return lead_data
+    except Exception as e:
+        st.error(f"Lead fetch failed: {str(e)}")
         return None
 
 
 def append_lead_info_to_tasks(tasks, close_api_key):
     updated_tasks = []
+    skipped_no_email = 0
+    skipped_wrong_consultant = 0
     for task in tasks:
         lead_info = get_lead_info(task["lead_id"], close_api_key)
-        if lead_info is None:
+        if not lead_info:
             st.error(f"Failed to get lead info for task {task['id']}")
             continue
-        task["lead_id"] = lead_info["id"]
-        task["company_name"] = lead_info["company_name"]
-        task["contact_name"] = lead_info["contact_name"]
-        task["contact_email"] = lead_info["contact_email"]
-        task["contact_firstname"] = lead_info["contact_firstname"]
-        task["contact_lastname"] = lead_info["contact_lastname"]
-        task["contact_lastinitial"] = (
-            lead_info["contact_lastname"][0] if lead_info["contact_lastname"] else ""
+        consultant = lead_info.get(
+            "custom.lcf_TRIulkQaxJArdGl2k89qY6NKR0ZTYkzjRdeILo1h5fi"
         )
-        # Add timezone information to task
-        task["timezone"] = lead_info.get("timezone")
-        task["timezone_offset"] = lead_info.get("timezone_offset")
-        task["timezone_abbr"] = lead_info.get("timezone_abbr")
-        task["timezone_error"] = lead_info.get("timezone_error")
-        updated_tasks.append(task)
+        if consultant != "Barbara Pigg":
+            skipped_wrong_consultant += 1
+            continue
+
+        # Only process leads that have an email
+        if lead_info["contact_email"]:
+            task["lead_id"] = lead_info["id"]
+            task["company_name"] = lead_info["company_name"]
+            task["contact_name"] = lead_info["contact_name"]
+            task["contact_email"] = lead_info["contact_email"]
+            task["contact_firstname"] = lead_info["contact_firstname"]
+            task["contact_lastname"] = lead_info["contact_lastname"]
+            task["contact_lastinitial"] = (
+                lead_info["contact_lastname"][0]
+                if lead_info["contact_lastname"]
+                else ""
+            )
+            task["lead_id"] = lead_info["id"]
+            task["company_name"] = lead_info["company_name"]
+            task["contact_name"] = lead_info["contact_name"]
+            task["contact_email"] = lead_info["contact_email"]
+            task["contact_firstname"] = lead_info["contact_firstname"]
+            task["contact_lastname"] = lead_info["contact_lastname"]
+            task["contact_lastinitial"] = (
+                lead_info["contact_lastname"][0]
+                if lead_info["contact_lastname"]
+                else ""
+            )
+            # Add timezone information to task
+            task["timezone"] = lead_info.get("timezone")
+            task["timezone_offset"] = lead_info.get("timezone_offset")
+            task["timezone_abbr"] = lead_info.get("timezone_abbr")
+            task["timezone_error"] = lead_info.get("timezone_error")
+            updated_tasks.append(task)
+        else:
+            skipped_no_email += 1
+            st.warning(
+                f"No email found for contact: {lead_info['contact_name']} at {lead_info['company_name']}"
+            )
+
+    if skipped_no_email > 0:
+        st.warning(f"Skipped {skipped_no_email} tasks due to missing contact emails")
+    if skipped_wrong_consultant > 0:
+        st.warning(
+            f"Skipped {skipped_wrong_consultant} tasks because they don't belong to Barbara Pigg"
+        )
+
     return updated_tasks
 
 
@@ -651,7 +737,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
     if st.session_state.search_attempted:
         if st.session_state.tasks:
             st.write(
-                f"Found {len(st.session_state.tasks)} lead(s) that have that task description to be completed:"
+                f"Found {len(st.session_state.tasks)} lead(s) that have that task description to be completed."
             )
             # Check if any tasks have timezone errors
             has_timezone_errors = any(
@@ -751,7 +837,9 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                 st.session_state.prev_placeholder_name = placeholder_event_name
 
             if st.button("Find Placeholder Slots"):
-                # All computation in the spinner
+                # Reset invite state when finding new slots
+                st.session_state.invites_sent = False
+                st.session_state.create_invites_clicked = False
                 with st.spinner("Finding and analyzing available slots..."):
                     result = process_placeholder_slots(
                         st.session_state.tasks,
