@@ -729,8 +729,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
         st.session_state.template_title = "Intro {{first_name}} {{last_initial}} @  {{company}} + Barbara P @ Whiteboard Geeks"
     if "template_description" not in st.session_state:
         st.session_state.template_description = event_description_default
-    if "slot_usage" not in st.session_state:
-        st.session_state.slot_usage = {}  # Will track {slot_start_time: number_of_leads}
 
     # Initialize session state for search attempt
     if "search_attempted" not in st.session_state:
@@ -1077,7 +1075,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                         minutes=slot_index
                                         * st.session_state.meeting_length
                                     )
-                                    slot_key = slot_start.isoformat()
 
                                     # Check if this slot is valid for the lead's timezone
                                     if task.get("timezone"):
@@ -1090,10 +1087,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                         # Skip if before 9am in lead's timezone
                                         if slot_start_local.hour < 9:
                                             continue
-
-                                    # Initialize slot usage if not exists
-                                    if slot_key not in st.session_state.slot_usage:
-                                        st.session_state.slot_usage[slot_key] = 0
 
                                     # Get existing events in this slot
                                     slot_end = slot_start + datetime.timedelta(
@@ -1116,12 +1109,11 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                         ]
                                     )
 
-                                    # Check if slot has capacity (considering both tracked invites and existing events)
-                                    total_events = (
-                                        st.session_state.slot_usage[slot_key]
-                                        + events_in_slot
-                                    )
-                                    if total_events < st.session_state.leads_per_block:
+                                    # Check if slot has capacity (using only actual calendar events)
+                                    if (
+                                        events_in_slot
+                                        < st.session_state.leads_per_block
+                                    ):
                                         # Create the calendar invite
                                         calendar_utils.create_calendar_invite(
                                             task,
@@ -1131,8 +1123,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                                             description_template=st.session_state.current_description,
                                         )
 
-                                        # Update slot usage
-                                        st.session_state.slot_usage[slot_key] += 1
                                         slot_found = True
 
                                         # Mark task as complete and update UI
