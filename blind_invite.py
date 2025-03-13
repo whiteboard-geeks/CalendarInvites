@@ -714,7 +714,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
     if "meeting_length" not in st.session_state:
         st.session_state.meeting_length = 30
     if "leads_per_block" not in st.session_state:
-        st.session_state.leads_per_block = 6
+        st.session_state.leads_per_block = 8
     if "invites_sent" not in st.session_state:
         st.session_state.invites_sent = False
     if "current_task_index" not in st.session_state:
