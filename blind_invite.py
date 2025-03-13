@@ -1047,6 +1047,88 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
                     # Send invite button at the top
                     if st.button("Send Invite", key="send_invite"):
                         try:
+                            # Check if lead already has an invite on the calendar
+                            from calendar_utils import check_lead_invite_exists
+
+                            # Generate a unique key for this task's dialog state
+                            dialog_state_key = f"dialog_state_{task['id']}"
+                            dialog_response_key = f"dialog_response_{task['id']}"
+
+                            # Initialize dialog state in session_state if not already present
+                            if dialog_state_key not in st.session_state:
+                                st.session_state[dialog_state_key] = "not_shown"
+                                st.session_state[dialog_response_key] = None
+
+                            # Only check for existing invites if we haven't shown the dialog yet
+                            if st.session_state[dialog_state_key] == "not_shown":
+                                dupe_invites_exist, dupe_invites_details = (
+                                    check_lead_invite_exists(task["contact_email"])
+                                )
+
+                                # If duplicates exist, show dialog and mark dialog as shown
+                                if dupe_invites_exist:
+                                    st.session_state[dialog_state_key] = "showing"
+
+                                    # Define the dialog function
+                                    @st.dialog(
+                                        f"Invite already exists for {task['contact_email']}"
+                                    )
+                                    def show_existing_invites():
+                                        st.write(
+                                            "The following calendar invites already exist for this email:"
+                                        )
+
+                                        # Display each existing invite
+                                        for dupe_invite_details in dupe_invites_details:
+                                            # Convert dateTime string to a more readable format if possible
+                                            start_time = dupe_invite_details.get(
+                                                "start", "No start time"
+                                            )
+                                            if (
+                                                isinstance(start_time, str)
+                                                and "T" in start_time
+                                            ):
+                                                try:
+                                                    dt = (
+                                                        datetime.datetime.fromisoformat(
+                                                            start_time.replace(
+                                                                "Z", "+00:00"
+                                                            )
+                                                        )
+                                                    )
+                                                    formatted_time = dt.strftime(
+                                                        "%Y-%m-%d %H:%M %Z"
+                                                    )
+                                                except ValueError:
+                                                    formatted_time = start_time
+                                            else:
+                                                formatted_time = start_time
+
+                                            st.write(
+                                                f"• {dupe_invite_details.get('summary', 'No title')} - {formatted_time}"
+                                            )
+
+                                        # Add a button to skip this invite
+                                        if st.button(
+                                            "Skip this invite and continue",
+                                            key=f"skip_button_{task['id']}",
+                                        ):
+                                            # Remove this task from the task list entirely
+                                            st.session_state.tasks = [
+                                                t
+                                                for t in st.session_state.tasks
+                                                if t["id"] != task["id"]
+                                            ]
+                                            st.success(
+                                                f"Skipped invite for {task['contact_name']} at {task['company_name']}"
+                                            )
+                                            st.rerun()
+
+                                    # Show the dialog
+                                    show_existing_invites()
+                                    # Stop here - wait for user response
+                                    st.stop()
+
                             # Find the next available slot
                             slot_found = False
                             for (

@@ -144,6 +144,63 @@ def create_calendar_invite(
         print(f"An error occurred: {error}")
 
 
+def check_lead_invite_exists(email):
+    """
+    Checks if a lead already has a calendar invite.
+
+    Args:
+        email: The email address of the lead to check
+
+    Returns:
+        tuple: (invite_exists, invite_details)
+            - invite_exists: Boolean indicating if an invite exists
+            - invite_details: List of invite summaries if invites exist, or a message if none found
+    """
+    try:
+        service = get_calendar_service()
+
+        # Use the q parameter to search for events that might include the email
+        # This searches across multiple fields including attendee's email
+        events_result = (
+            service.events()
+            .list(
+                calendarId=CALENDAR_ID,
+                q=email,  # Search for the email in all fields
+                maxResults=100,  # Increase this if needed
+                singleEvents=True,
+            )
+            .execute()
+        )
+
+        events = events_result.get("items", [])
+
+        # Filter events to only include those where the email is in attendees
+        matching_events = []
+        for event in events:
+            attendees = event.get("attendees", [])
+            for attendee in attendees:
+                if attendee.get("email", "").lower() == email.lower():
+                    event_details = {
+                        "summary": event.get("summary", "No title"),
+                        "start": event.get("start", {}).get(
+                            "dateTime", "No start time"
+                        ),
+                        "id": event.get("id", ""),
+                    }
+                    matching_events.append(event_details)
+                    break
+
+        if matching_events:
+            return True, matching_events
+        else:
+            return False, "No invite found, safe to send"
+
+    except HttpError as error:
+        print(f"An error occurred while checking for existing invites: {error}")
+        # In case of error, allow the process to continue
+        return False, f"Error checking invites: {str(error)}"
+
+
 def get_events_in_range(start_time, end_time):
     """Gets all calendar events within a given time range."""
     try:
