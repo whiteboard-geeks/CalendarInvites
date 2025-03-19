@@ -653,11 +653,11 @@ def main():
     # Default event description template
     event_description_default = """Hi {{first_name}},
 
-I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for medical companies. Not terribly long ago I sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
+I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago I sent you a package with what we call a ‘Video Card’ or ‘Video Brochure’. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I’d invite you to a quick meeting.
 
-I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Medtronic, Eli Lilly, and Cleveland Clinic. 
+I’m hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Eli Lilly, Eisai Pharmaceuticals, Tyson Foods, Michelin Tires, IBM and Cleveland Clinic. 
 
-If this time doesn't work for you please feel free to propose one that does. Whatever is convenient.
+If this time doesn’t work for you please feel free to propose one that does. Whatever is convenient.
 
 Agenda:
 - Share science behind the Whiteboard Geeks success stories, benchmarking data, and observed industry trends
@@ -665,7 +665,7 @@ Agenda:
 - Get feedback on the usefulness of Whiteboard Geeks services for your organization
 - Plus we'll unlock the vault and show you videos related to your specific challenge-because videos are fun 😊🎥⭐
 
-As a bonus: I'll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
+As a bonus: I’ll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
 
 Zoom Call information:
 Barbara Pigg is inviting you to a scheduled Zoom meeting.
@@ -706,7 +706,8 @@ Dial by your location
 
 Meeting ID: 496 012 7137
 
-Find your local number: https://us02web.zoom.us/u/ksKzmwpEc"""
+Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
+"""
 
     # Initialize session state for tasks and options
     if "tasks" not in st.session_state:
