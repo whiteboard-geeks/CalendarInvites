@@ -431,12 +431,14 @@ def process_placeholder_slots(
 
     # Map times to timezones for display
     schedule_times = {
-        "9am": {"tz": "ET", "count": timezone_counts["ET"]},
-        "10am": {"tz": "CT", "count": timezone_counts["CT"]},
-        "11am": {"tz": "MT", "count": timezone_counts["MT"]},
-        "12pm": {"tz": "PT", "count": timezone_counts["PT"]},
-        "1pm": {"tz": "AK", "count": timezone_counts["AK"]},
+        "4pm": {"tz": "HI", "count": timezone_counts["HI"]},
+        "3pm": {"tz": "HI", "count": timezone_counts["HI"]},
         "2pm": {"tz": "HI", "count": timezone_counts["HI"]},
+        "1pm": {"tz": "AK", "count": timezone_counts["AK"]},
+        "12pm": {"tz": "PT", "count": timezone_counts["PT"]},
+        "11am": {"tz": "MT", "count": timezone_counts["MT"]},
+        "10am": {"tz": "CT", "count": timezone_counts["CT"]},
+        "9am": {"tz": "ET", "count": timezone_counts["ET"]},
     }
 
     # Get placeholder events
@@ -498,6 +500,8 @@ def process_placeholder_slots(
 
     # First calculate total slots available at each hour
     slots_at_hour = {
+        16: 0,  # 4pm
+        15: 0,  # 3pm
         14: 0,  # 2pm
         13: 0,  # 1pm
         12: 0,  # 12pm
@@ -515,7 +519,6 @@ def process_placeholder_slots(
         end_dt = datetime.datetime.fromisoformat(end)
 
         # Calculate number of complete slots that fit within the event duration
-        # Use floor division to ensure we don't include a partial slot at the end
         duration_minutes = (end_dt - start_dt).total_seconds() / 60
         num_slots = int(duration_minutes // meeting_length)
         event_slots = []
@@ -549,11 +552,20 @@ def process_placeholder_slots(
             available_in_slot = max(0, leads_per_block - events_in_slot)
             total_available_slots += available_in_slot
 
-            # Add to the appropriate hour bucket
+            # Convert slot times to Eastern Time for hour bucket assignment
             slot_start_et = slot_start.astimezone(pytz.timezone("America/New_York"))
-            hour_et = slot_start_et.hour
-            if hour_et in slots_at_hour:
-                slots_at_hour[hour_et] += available_in_slot
+            slot_end_et = slot_end.astimezone(pytz.timezone("America/New_York"))
+
+            # Add this slot's availability to all hour buckets it overlaps with
+            for hour in slots_at_hour.keys():
+                hour_start = slot_start_et.replace(
+                    hour=hour, minute=0, second=0, microsecond=0
+                )
+                hour_end = hour_start + datetime.timedelta(hours=1)
+
+                # Check if this slot overlaps with this hour
+                if slot_start_et < hour_end and slot_end_et > hour_start:
+                    slots_at_hour[hour] += available_in_slot
 
             # Store slot availability for display
             event_slots.append(
@@ -566,8 +578,12 @@ def process_placeholder_slots(
 
         slot_availability.append({"event": event, "slots": event_slots})
 
+    st.write(f"\nTotal available slots across all times: {total_available_slots}")
+
     # Now allocate slots to each timezone requirement
     time_to_hour = {
+        "4pm": 16,
+        "3pm": 15,
         "2pm": 14,
         "1pm": 13,
         "12pm": 12,
@@ -579,7 +595,7 @@ def process_placeholder_slots(
     # Start with latest time first
     unallocated_slots = dict(slots_at_hour)  # Copy of available slots
     available_slots = {}
-    for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
+    for time in ["4pm", "3pm", "2pm", "1pm", "12pm", "11am", "10am", "9am"]:
         hour = time_to_hour[time]
         leads_needed = timezone_counts[schedule_times[time]["tz"]]
 
@@ -603,7 +619,7 @@ def process_placeholder_slots(
     # Create table rows
     table_data = []
     all_timezones_satisfied = True
-    for time in ["2pm", "1pm", "12pm", "11am", "10am", "9am"]:
+    for time in ["4pm", "3pm", "2pm", "1pm", "12pm", "11am", "10am", "9am"]:
         leads = timezone_counts[schedule_times[time]["tz"]]
         available = available_slots[time]
         status = "✅" if available >= leads else "⛔"
@@ -617,6 +633,10 @@ def process_placeholder_slots(
                 "Status": status,
             }
         )
+
+    st.write("\nFinal slot counts by hour:")
+    for hour in sorted(slots_at_hour.keys()):
+        st.write(f"{hour}:00 - {slots_at_hour[hour]} slots")
 
     return {
         "timezone_counts": timezone_counts,
@@ -653,11 +673,11 @@ def main():
     # Default event description template
     event_description_default = """Hi {{first_name}},
 
-I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago I sent you a package with what we call a ‘Video Card’ or ‘Video Brochure’. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I’d invite you to a quick meeting.
+I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago I sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
 
-I’m hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Eli Lilly, Eisai Pharmaceuticals, Tyson Foods, Michelin Tires, IBM and Cleveland Clinic. 
+I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Eli Lilly, Eisai Pharmaceuticals, Tyson Foods, Michelin Tires, IBM and Cleveland Clinic. 
 
-If this time doesn’t work for you please feel free to propose one that does. Whatever is convenient.
+If this time doesn't work for you please feel free to propose one that does. Whatever is convenient.
 
 Agenda:
 - Share science behind the Whiteboard Geeks success stories, benchmarking data, and observed industry trends
@@ -665,7 +685,7 @@ Agenda:
 - Get feedback on the usefulness of Whiteboard Geeks services for your organization
 - Plus we'll unlock the vault and show you videos related to your specific challenge-because videos are fun 😊🎥⭐
 
-As a bonus: I’ll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
+As a bonus: I'll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
 
 Zoom Call information:
 Barbara Pigg is inviting you to a scheduled Zoom meeting.
