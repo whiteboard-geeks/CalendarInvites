@@ -616,23 +616,133 @@ def process_placeholder_slots(
                 unallocated_slots[h] -= allocated
                 slots_to_allocate -= allocated
 
+    # Map timezones to their display names and required times
+    timezone_display = {
+        "4pm": "Hawaii",
+        "3pm": "Hawaii",
+        "2pm": "Hawaii",
+        "1pm": "Alaska",
+        "12pm": "Pacific",
+        "11am": "Mountain",
+        "10am": "Central",
+        "9am": "Eastern",
+    }
+
     # Create table rows
     table_data = []
     all_timezones_satisfied = True
+    displayed_timezones = set()  # Track which timezones we've already shown
+    timezone_slots = {}  # Track total slots for each timezone display name
+
+    # First pass to calculate total slots for each timezone
     for time in ["4pm", "3pm", "2pm", "1pm", "12pm", "11am", "10am", "9am"]:
+        tz_display = timezone_display[time]
         leads = timezone_counts[schedule_times[time]["tz"]]
-        available = available_slots[time]
-        status = "✅" if available >= leads else "⛔"
-        if status == "⛔":
-            all_timezones_satisfied = False
-        table_data.append(
-            {
-                "Time (ET) or later": time,
-                "Leads to Schedule": leads,
-                "Available Slots": available,
-                "Status": status,
-            }
-        )
+        hour = time_to_hour[time]
+
+        if tz_display not in timezone_slots:
+            if tz_display == "Hawaii":
+                # For Hawaii, sum slots from 2pm, 3pm, and 4pm
+                hawaii_slots = (
+                    slots_at_hour[16]  # 4pm
+                    + slots_at_hour[15]  # 3pm
+                    + slots_at_hour[14]  # 2pm
+                )
+                timezone_slots[tz_display] = {
+                    "leads": leads,
+                    "available": hawaii_slots,
+                    "used": min(leads, hawaii_slots),  # Track used slots
+                    "status": "✅" if hawaii_slots >= leads else "⛔",
+                }
+            elif tz_display == "Alaska":
+                # Alaska gets Hawaii's slots + 1pm slots - slots used by Hawaii
+                hawaii_info = timezone_slots["Hawaii"]
+                alaska_total = (
+                    hawaii_info["available"] + slots_at_hour[13] - hawaii_info["used"]
+                )
+                timezone_slots[tz_display] = {
+                    "leads": leads,
+                    "available": alaska_total,
+                    "used": min(leads, alaska_total),
+                    "status": "✅" if alaska_total >= leads else "⛔",
+                }
+            elif tz_display == "Pacific":
+                # Pacific gets Alaska's slots + 12pm slots - slots used by Alaska
+                alaska_info = timezone_slots["Alaska"]
+                pacific_total = (
+                    alaska_info["available"] + slots_at_hour[12] - alaska_info["used"]
+                )
+                timezone_slots[tz_display] = {
+                    "leads": leads,
+                    "available": pacific_total,
+                    "used": min(leads, pacific_total),
+                    "status": "✅" if pacific_total >= leads else "⛔",
+                }
+            elif tz_display == "Mountain":
+                # Mountain gets Pacific's slots + 11am slots - slots used by Pacific
+                pacific_info = timezone_slots["Pacific"]
+                mountain_total = (
+                    pacific_info["available"] + slots_at_hour[11] - pacific_info["used"]
+                )
+                timezone_slots[tz_display] = {
+                    "leads": leads,
+                    "available": mountain_total,
+                    "used": min(leads, mountain_total),
+                    "status": "✅" if mountain_total >= leads else "⛔",
+                }
+            elif tz_display == "Central":
+                # Central gets Mountain's slots + 10am slots - slots used by Mountain
+                mountain_info = timezone_slots["Mountain"]
+                central_total = (
+                    mountain_info["available"]
+                    + slots_at_hour[10]
+                    - mountain_info["used"]
+                )
+                timezone_slots[tz_display] = {
+                    "leads": leads,
+                    "available": central_total,
+                    "used": min(leads, central_total),
+                    "status": "✅" if central_total >= leads else "⛔",
+                }
+            else:  # Eastern
+                # Eastern gets Central's slots + 9am slots - slots used by Central
+                central_info = timezone_slots["Central"]
+                eastern_total = (
+                    central_info["available"] + slots_at_hour[9] - central_info["used"]
+                )
+                timezone_slots[tz_display] = {
+                    "leads": leads,
+                    "available": eastern_total,
+                    "used": min(leads, eastern_total),
+                    "status": "✅" if eastern_total >= leads else "⛔",
+                }
+
+    # Create table rows from aggregated data
+    for time in [
+        "2pm",
+        "1pm",
+        "12pm",
+        "11am",
+        "10am",
+        "9am",
+    ]:  # Only show each timezone once
+        tz_display = timezone_display[time]
+        if tz_display not in displayed_timezones:
+            slot_info = timezone_slots[tz_display]
+            if slot_info["status"] == "⛔":
+                all_timezones_satisfied = False
+
+            table_data.append(
+                {
+                    "Timezone": tz_display,
+                    "Leads to Schedule": slot_info["leads"],
+                    "Available Slots": slot_info["available"],
+                    "Status": slot_info["status"],
+                }
+            )
+            displayed_timezones.add(tz_display)
+
+    st.write(f"\nTotal available slots across all times: {total_available_slots}")
 
     st.write("\nFinal slot counts by hour:")
     for hour in sorted(slots_at_hour.keys()):
