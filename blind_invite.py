@@ -411,16 +411,7 @@ def process_placeholder_slots(
         leads_per_block: Number of leads that can be scheduled in each time slot
 
     Returns:
-        dict: Contains all the processed data needed for display, including:
-            - timezone_counts: Count of leads in each timezone
-            - slots_needed: Slots needed at each time
-            - schedule_times: Mapping of times to timezones
-            - placeholder_events: List of placeholder events found
-            - total_available_slots: Total number of available slots
-            - available_slots: Available slots at each time
-            - all_timezones_satisfied: Whether all timezone requirements are met
-            - table_data: Formatted data for display
-            - slot_availability: Detailed availability for each slot
+        dict: Contains all the processed data needed for display
     """
     # Reset invite state when finding new slots
     st.session_state.invites_sent = False
@@ -578,44 +569,6 @@ def process_placeholder_slots(
 
         slot_availability.append({"event": event, "slots": event_slots})
 
-    st.write(f"\nTotal available slots across all times: {total_available_slots}")
-
-    # Now allocate slots to each timezone requirement
-    time_to_hour = {
-        "4pm": 16,
-        "3pm": 15,
-        "2pm": 14,
-        "1pm": 13,
-        "12pm": 12,
-        "11am": 11,
-        "10am": 10,
-        "9am": 9,
-    }
-
-    # Start with latest time first
-    unallocated_slots = dict(slots_at_hour)  # Copy of available slots
-    available_slots = {}
-    for time in ["4pm", "3pm", "2pm", "1pm", "12pm", "11am", "10am", "9am"]:
-        hour = time_to_hour[time]
-        leads_needed = timezone_counts[schedule_times[time]["tz"]]
-
-        # Calculate total available slots at or after this hour
-        slots_available = sum(
-            unallocated_slots[h] for h in unallocated_slots if h >= hour
-        )
-
-        # Record available slots for this time
-        available_slots[time] = slots_available
-
-        # Remove the slots we need for this timezone from available slots,
-        # starting with the earliest possible time for this timezone
-        slots_to_allocate = min(leads_needed, slots_available)
-        for h in sorted(unallocated_slots.keys()):
-            if h >= hour and slots_to_allocate > 0:
-                allocated = min(slots_to_allocate, unallocated_slots[h])
-                unallocated_slots[h] -= allocated
-                slots_to_allocate -= allocated
-
     # Map timezones to their display names and required times
     timezone_display = {
         "4pm": "Hawaii",
@@ -626,6 +579,18 @@ def process_placeholder_slots(
         "11am": "Mountain",
         "10am": "Central",
         "9am": "Eastern",
+    }
+
+    # Map times to hour numbers
+    time_to_hour = {
+        "4pm": 16,
+        "3pm": 15,
+        "2pm": 14,
+        "1pm": 13,
+        "12pm": 12,
+        "11am": 11,
+        "10am": 10,
+        "9am": 9,
     }
 
     # Create table rows
@@ -742,22 +707,17 @@ def process_placeholder_slots(
             )
             displayed_timezones.add(tz_display)
 
-    st.write(f"\nTotal available slots across all times: {total_available_slots}")
-
-    st.write("\nFinal slot counts by hour:")
-    for hour in sorted(slots_at_hour.keys()):
-        st.write(f"{hour}:00 - {slots_at_hour[hour]} slots")
-
     return {
         "timezone_counts": timezone_counts,
         "slots_needed": slots_needed,
         "schedule_times": schedule_times,
         "placeholder_events": placeholder_events,
         "total_available_slots": total_available_slots,
-        "available_slots": available_slots,
+        "available_slots": timezone_slots,
         "all_timezones_satisfied": all_timezones_satisfied,
         "table_data": table_data,
         "slot_availability": slot_availability,
+        "slots_at_hour": slots_at_hour,
     }
 
 
@@ -1029,7 +989,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
                         )
 
                 # Make entire Available slots section collapsible
-                with st.expander("### Available slots in placeholder events"):
+                with st.expander("Available slots in placeholder events"):
                     # Create tabs for each block
                     tab_labels = []
                     for event_data in result["slot_availability"]:
@@ -1063,6 +1023,27 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
                                 st.write(
                                     f"{slot_start_et.strftime('%I:%M %p')} ET - {slot['available']} of {slot['total']} available"
                                 )
+
+                # Create Slot Summary section
+                st.write("\n### Slot Summary")
+
+                # Create hour slots table data
+                hour_slots_data = []
+                for hour in sorted(result["slots_at_hour"].keys()):
+                    hour_slots_data.append(
+                        {
+                            "Hour (ET)": f"{hour}:00",
+                            "Available Slots": result["slots_at_hour"][hour],
+                        }
+                    )
+
+                # Display hour slots table
+                st.table(hour_slots_data)
+
+                # Display total slots
+                st.write(
+                    f"**Total available slots across all times:** {result['total_available_slots']}"
+                )
 
                 # Display timezone requirements analysis
                 st.write("\n### Timezone Requirements Analysis")
