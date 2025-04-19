@@ -1148,22 +1148,23 @@ def main():
 
                     # Contact information at the top
                     st.write("### Contact Information")
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2 = st.columns(2)
                     with col1:
+                        st.write(
+                            f"**Consultant:** {current_consultant['basic_info']['full_name']}"
+                        )
                         st.write(
                             f"**Name:** {task['contact_firstname']} {task['contact_lastname']}"
                         )
                         st.write(f"**Company:** {task['company_name']}")
                     with col2:
-                        st.write(f"**Email:** {task['contact_email']}")
-                    with col3:
                         if task.get("timezone"):
                             st.write(
                                 f"**Timezone:** {task['timezone_abbr']} ({task['timezone_offset']})"
                             )
                         else:
                             st.write("**Timezone:** Unknown")
-
+                        st.write(f"**Email:** {task['contact_email']}")
                     # Send invite button at the top
                     if st.button("Send Invite", key="send_invite"):
                         try:

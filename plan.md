@@ -108,5 +108,4 @@ Other references:
    - [ ] Review and test April's configuration
 
 2. **User Experience Improvements**
-   - [ ] Add "Consultant" to the "Contact Information" section where the user clicks "Send Invite"
-   - [ ] Consider color-coding or labeling interface elements by consultant
+   - [x] Add "Consultant" to the "Contact Information" section where the user clicks "Send Invite"
