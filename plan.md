@@ -54,40 +54,13 @@
   - [x] Update event title to include consultant first name and last initial
   - [x] Create to-do for updating April's description template later
 
-- [ ] **Handle Close CRM Integration**
-  - [ ] Update custom activity creation with consultant-specific IDs
-  - [ ] Ensure proper task assignment and completion
-  - [ ] Note: Custom activity type ID is the same for all consultants
-
-- [ ] **Add Settings/Configuration UI**
-  - [ ] Create admin interface for adding/editing consultant information
-  - [ ] Implement secure storage for consultant credentials
-
-## Data Storage Options
-
-1. **Streamlit Secrets**
-   - Store consultant configurations in secrets.toml
-   - Secure but requires deployment changes to update
-
-2. **Database Integration**
-   - Add simple database to store consultant profiles
-   - Allows for easier updates through admin UI
-
-3. **Configuration Files**
-   - Store consultant data in JSON/YAML configuration files
-   - Balance between flexibility and security
-
 ## User Experience Considerations
 
-1. **Permissions**
-   - Ensure app requires authentication before selecting consultants
-   - Consider role-based permissions for admins vs. regular users
-
-2. **Default Selection**
+1. **Default Selection**
    - [x] No default consultant - explicit selection required
    - Remember last used consultant for returning users
 
-3. **Visual Indicators**
+2. **Visual Indicators**
    - Clearly show which consultant is currently active
    - Color-code or label interface elements by consultant
 
@@ -114,7 +87,7 @@ In calendar_utils.py:
 
 Other references:
 
-- [ ] The Close CRM custom activity type ID: `"custom_activity_type_id": "actitype_0CmcjmRFeEsO3yJFnLLVpS"`
+- The Close CRM custom activity type ID: `"custom_activity_type_id": "actitype_0CmcjmRFeEsO3yJFnLLVpS"`
 
 ## April Lowrie Information (For Reference)
 
@@ -126,3 +99,14 @@ Other references:
 - Event title format: "Intro {{first_name}} {{last_initial}} @ {{company}} + April L @ Whiteboard Geeks"
 - Description template: Will need to be customized later
 - Custom activity type ID: Same as Barbara's
+
+## Remaining TODOs
+
+1. **April Lowrie Information Updates**
+   - [ ] Update April's Zoom meeting URL and meeting ID
+   - [x] Create customized description template for April
+   - [ ] Review and test April's configuration
+
+2. **User Experience Improvements**
+   - [ ] Add "Consultant" to the "Contact Information" section where the user clicks "Send Invite"
+   - [ ] Consider color-coding or labeling interface elements by consultant

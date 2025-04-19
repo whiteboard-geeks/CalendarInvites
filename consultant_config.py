@@ -145,10 +145,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc""",
         },
         "templates": {
             "title": "Intro {{first_name}} {{last_initial}} @  {{company}} + April L @ Whiteboard Geeks",
-            # TODO: Update with April's customized description template
             "description": """Hi {{first_name}},
-
-# TODO: Customize this template for April Lowrie
 
 I'm the Creative Director of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago we sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
 
