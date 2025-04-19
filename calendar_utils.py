@@ -1,5 +1,6 @@
 import datetime
 import streamlit as st
+import consultant_config
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -7,7 +8,20 @@ from googleapiclient.errors import HttpError
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
-CALENDAR_ID = "barbara.pigg@whiteboardgeeks.com"
+
+
+def get_current_calendar_id():
+    """Get the calendar ID for the currently selected consultant."""
+    if (
+        "selected_consultant" in st.session_state
+        and st.session_state.selected_consultant
+    ):
+        consultant = consultant_config.get_consultant(
+            st.session_state.selected_consultant
+        )
+        return consultant["calendar"]["calendar_id"]
+    # Return None if no consultant is selected
+    return None
 
 
 def format_template(template, task):
@@ -51,8 +65,14 @@ def get_calendar_service():
             scopes=SCOPES,
         )
 
+        # Get current calendar ID
+        calendar_id = get_current_calendar_id()
+        if not calendar_id:
+            st.error("No calendar ID available. Please select a consultant first.")
+            return None
+
         # Create delegated credentials for the calendar owner
-        delegated_credentials = credentials.with_subject(CALENDAR_ID)
+        delegated_credentials = credentials.with_subject(calendar_id)
 
         return build("calendar", "v3", credentials=delegated_credentials)
 
@@ -73,7 +93,7 @@ def find_placeholder_events(query="Blind Invite"):
         events_result = (
             service.events()
             .list(
-                calendarId=CALENDAR_ID,
+                calendarId=get_current_calendar_id(),
                 timeMin=now,
                 maxResults=10,
                 singleEvents=True,
@@ -114,7 +134,9 @@ def create_calendar_invite(
         event = {
             "summary": title,
             "description": description,
-            "location": "https://us02web.zoom.us/j/4960127137",
+            "location": consultant_config.get_consultant(
+                st.session_state.selected_consultant
+            )["meeting"]["zoom_url"],
             "start": {
                 "dateTime": start_time,
                 "timeZone": "UTC",
@@ -125,7 +147,7 @@ def create_calendar_invite(
             },
             "attendees": [
                 {
-                    "email": "barbara.pigg@whiteboardgeeks.com",
+                    "email": get_current_calendar_id(),
                     "responseStatus": "accepted",
                     "self": True,
                 },
@@ -135,7 +157,7 @@ def create_calendar_invite(
 
         event = (
             service.events()
-            .insert(calendarId=CALENDAR_ID, body=event, sendUpdates="all")
+            .insert(calendarId=get_current_calendar_id(), body=event, sendUpdates="all")
             .execute()
         )
         return event
@@ -164,7 +186,7 @@ def check_lead_invite_exists(email):
         events_result = (
             service.events()
             .list(
-                calendarId=CALENDAR_ID,
+                calendarId=get_current_calendar_id(),
                 q=email,  # Search for the email in all fields
                 maxResults=100,  # Increase this if needed
                 singleEvents=True,
@@ -213,7 +235,7 @@ def get_events_in_range(start_time, end_time):
         events_result = (
             service.events()
             .list(
-                calendarId=CALENDAR_ID,
+                calendarId=get_current_calendar_id(),
                 timeMin=start_time,
                 timeMax=end_time,
                 singleEvents=True,

@@ -34,24 +34,25 @@
   - [x] Add placeholder for April's Zoom URL and meeting ID (to be determined)
   - [x] Add functionality to access consultant's first name and last initial for templates
 
-- [ ] **Add Consultant Selection UI**
-  - [ ] Add dropdown at top of app to select consultant
-  - [ ] Store selection in session state
-  - [ ] Apply selection when searching tasks and creating invites
+- [x] **Add Consultant Selection UI**
+  - [x] Add dropdown at top of app to select consultant
+  - [x] Store selection in session state
+  - [x] Apply selection when searching tasks and creating invites
+  - [x] Added validation to prevent defaulting to any consultant
 
-- [ ] **Modify Filtering Logic**
-  - [ ] Replace hardcoded `if consultant != "Barbara Pigg"` check with dynamic lookup
-  - [ ] Update task filtering to use selected consultant
+- [x] **Modify Filtering Logic**
+  - [x] Replace hardcoded `if consultant != "Barbara Pigg"` check with dynamic lookup
+  - [x] Update task filtering to use selected consultant
 
-- [ ] **Update Calendar Integration**
-  - [ ] Make calendar ID dynamic based on selected consultant
-  - [ ] Update attendee information in calendar invites
+- [x] **Update Calendar Integration**
+  - [x] Make calendar ID dynamic based on selected consultant
+  - [x] Update attendee information in calendar invites
 
-- [ ] **Customize Templates**
-  - [ ] Load appropriate templates based on selected consultant
-  - [ ] Replace hardcoded meeting information
-  - [ ] Update event title to include consultant first name and last initial
-  - [ ] Create to-do for updating April's description template later
+- [x] **Customize Templates**
+  - [x] Load appropriate templates based on selected consultant
+  - [x] Replace hardcoded meeting information
+  - [x] Update event title to include consultant first name and last initial
+  - [x] Create to-do for updating April's description template later
 
 - [ ] **Handle Close CRM Integration**
   - [ ] Update custom activity creation with consultant-specific IDs
@@ -83,8 +84,8 @@
    - Consider role-based permissions for admins vs. regular users
 
 2. **Default Selection**
+   - [x] No default consultant - explicit selection required
    - Remember last used consultant for returning users
-   - Set sensible default for new sessions
 
 3. **Visual Indicators**
    - Clearly show which consultant is currently active
@@ -94,22 +95,22 @@
 
 In blind_invite.py:
 
-- [ ] Line 168-173: Consultant filtering - `if consultant != "Barbara Pigg":`
-- [ ] Line 243-249: Event description template with Barbara Pigg's information
-- [ ] Line 244: `I'm the CEO of Whiteboard Geeks` (company-specific text)
-- [ ] Line 272-301: Zoom meeting information hard-coded in template
-- [ ] Line 276: `Barbara Pigg is inviting you`
-- [ ] Line 278: `Barbara Pigg's Personal Meeting Room`
-- [ ] Line 280: `https://us02web.zoom.us/j/4960127137`
-- [ ] Line 282: `Meeting ID: 496 012 7137`
+- [x] Line 168-173: Consultant filtering - `if consultant != "Barbara Pigg":`
+- [x] Line 243-249: Event description template with Barbara Pigg's information
+- [x] Line 244: `I'm the CEO of Whiteboard Geeks` (company-specific text)
+- [x] Line 272-301: Zoom meeting information hard-coded in template
+- [x] Line 276: `Barbara Pigg is inviting you`
+- [x] Line 278: `Barbara Pigg's Personal Meeting Room`
+- [x] Line 280: `https://us02web.zoom.us/j/4960127137`
+- [x] Line 282: `Meeting ID: 496 012 7137`
 
 In calendar_utils.py:
 
-- [ ] Line 9: `CALENDAR_ID = "barbara.pigg@whiteboardgeeks.com"`
-- [ ] Line 155: Email hard-coded in calendar invite attendees: `"email": "barbara.pigg@whiteboardgeeks.com"`
-- [ ] Line 156: Set as calendar owner with `"self": True`
-- [ ] Line 185: Same CALENDAR_ID used in checking lead invites
-- [ ] Line 216: Same CALENDAR_ID used in getting events in range
+- [x] Line 9: `CALENDAR_ID = "barbara.pigg@whiteboardgeeks.com"`
+- [x] Line 155: Email hard-coded in calendar invite attendees: `"email": "barbara.pigg@whiteboardgeeks.com"`
+- [x] Line 156: Set as calendar owner with `"self": True`
+- [x] Line 185: Same CALENDAR_ID used in checking lead invites
+- [x] Line 216: Same CALENDAR_ID used in getting events in range
 
 Other references:
 

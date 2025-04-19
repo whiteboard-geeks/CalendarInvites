@@ -3,6 +3,7 @@ import requests
 import base64
 import calendar_utils
 import datetime
+import consultant_config  # Import the consultant configuration module
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -275,7 +276,14 @@ def append_lead_info_to_tasks(tasks, close_api_key):
         consultant = lead_info.get(
             "custom.lcf_TRIulkQaxJArdGl2k89qY6NKR0ZTYkzjRdeILo1h5fi"
         )
-        if consultant != "Barbara Pigg":
+        # Get currently selected consultant's full name from config
+        current_consultant_config = consultant_config.get_consultant(
+            st.session_state.selected_consultant
+        )
+        current_consultant_name = current_consultant_config["basic_info"]["full_name"]
+
+        # Filter tasks based on consultant
+        if consultant != current_consultant_name:
             skipped_wrong_consultant += 1
             continue
 
@@ -319,7 +327,7 @@ def append_lead_info_to_tasks(tasks, close_api_key):
         st.warning(f"Skipped {skipped_no_email} tasks due to missing contact emails")
     if skipped_wrong_consultant > 0:
         st.warning(
-            f"Skipped {skipped_wrong_consultant} tasks because they don't belong to Barbara Pigg"
+            f"Skipped {skipped_wrong_consultant} tasks because they don't belong to {current_consultant_name}"
         )
 
     return updated_tasks
@@ -740,64 +748,64 @@ def main():
 
     st.title("Auto Calendar Invites")
 
-    # Default event description template
-    event_description_default = """Hi {{first_name}},
+    # Add consultant selection dropdown
+    if "selected_consultant" not in st.session_state:
+        st.session_state.selected_consultant = None  # No default selection
 
-I'm the CEO of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago I sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
+    consultant_choices = consultant_config.get_consultant_choices()
+    consultant_options = {name: id for id, name in consultant_choices}
 
-I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Eli Lilly, Eisai Pharmaceuticals, Tyson Foods, Michelin Tires, IBM and Cleveland Clinic. 
+    # Add a "Select a consultant" placeholder option if no consultant is selected
+    display_options = list(consultant_options.keys())
+    index = 0  # Default to first option in the list
 
-If this time doesn't work for you please feel free to propose one that does. Whatever is convenient.
+    if st.session_state.selected_consultant:
+        # If a consultant is already selected, set the dropdown to show that selection
+        index = display_options.index(
+            next(
+                name
+                for id, name in consultant_choices
+                if id == st.session_state.selected_consultant
+            )
+        )
 
-Agenda:
-- Share science behind the Whiteboard Geeks success stories, benchmarking data, and observed industry trends
-- Learn about your current objectives and challenges
-- Get feedback on the usefulness of Whiteboard Geeks services for your organization
-- Plus we'll unlock the vault and show you videos related to your specific challenge-because videos are fun 😊🎥⭐
+    selected_consultant_name = st.selectbox(
+        "Select Consultant:",
+        options=display_options,
+        index=index,
+    )
 
-As a bonus: I'll give you a fun hand-drawn virtual background just for showing your smiling face! Yay! We get lots of compliments on our backgrounds…and now you can have one! 
+    # Update the selected consultant
+    st.session_state.selected_consultant = consultant_options[selected_consultant_name]
 
-Zoom Call information:
-Barbara Pigg is inviting you to a scheduled Zoom meeting.
+    # Require consultant selection before proceeding
+    if not st.session_state.selected_consultant:
+        st.warning("Please select a consultant to continue.")
+        # Stop execution here to prevent the rest of the app from running
+        st.stop()
 
-Topic: Barbara Pigg's Personal Meeting Room
+    # Check if consultant selection changed
+    if "previous_consultant" not in st.session_state:
+        st.session_state.previous_consultant = st.session_state.selected_consultant
 
-Join Zoom Meeting
-https://us02web.zoom.us/j/4960127137
+    if st.session_state.previous_consultant != st.session_state.selected_consultant:
+        # Consultant selection changed, update templates
+        current_consultant = consultant_config.get_consultant(
+            st.session_state.selected_consultant
+        )
+        st.session_state.template_title = current_consultant["templates"]["title"]
+        st.session_state.template_description = current_consultant["templates"][
+            "description"
+        ]
+        st.session_state.previous_consultant = st.session_state.selected_consultant
 
-Meeting ID: 496 012 7137
+    # Get the consultant configuration
+    current_consultant = consultant_config.get_consultant(
+        st.session_state.selected_consultant
+    )
 
----
-
-One tap mobile
-+16469313860,,4960127137# US
-+13017158592,,4960127137# US (Washington DC)
-
----
-
-Dial by your location
-• +1 646 931 3860 US
-• +1 301 715 8592 US (Washington DC)
-• +1 305 224 1968 US
-• +1 309 205 3325 US
-• +1 312 626 6799 US (Chicago)
-• +1 646 558 8656 US (New York)
-• +1 346 248 7799 US (Houston)
-• +1 360 209 5623 US
-• +1 386 347 5053 US
-• +1 507 473 4847 US
-• +1 564 217 2000 US
-• +1 669 444 9171 US
-• +1 669 900 9128 US (San Jose)
-• +1 689 278 1000 US
-• +1 719 359 4580 US
-• +1 253 205 0468 US
-• +1 253 215 8782 US (Tacoma)
-
-Meeting ID: 496 012 7137
-
-Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
-"""
+    # Default event description template from consultant config
+    event_description_default = current_consultant["templates"]["description"]
 
     # Initialize session state for tasks and options
     if "tasks" not in st.session_state:
@@ -817,7 +825,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc
     if "current_description" not in st.session_state:
         st.session_state.current_description = ""
     if "template_title" not in st.session_state:
-        st.session_state.template_title = "Intro {{first_name}} {{last_initial}} @  {{company}} + Barbara P @ Whiteboard Geeks"
+        st.session_state.template_title = current_consultant["templates"]["title"]
     if "template_description" not in st.session_state:
         st.session_state.template_description = event_description_default
 
