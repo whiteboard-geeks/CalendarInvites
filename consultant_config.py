@@ -115,9 +115,8 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc""",
         },
         "calendar": {"calendar_id": "april.lowrie@whiteboardgeeks.com"},
         "meeting": {
-            # TODO: Update with April's actual Zoom information
-            "zoom_url": "PLACEHOLDER - UPDATE WITH APRIL'S ZOOM URL",
-            "zoom_id": "PLACEHOLDER - UPDATE WITH APRIL'S ZOOM ID",
+            "zoom_url": " https://us02web.zoom.us/j/3707084191",
+            "zoom_id": "370 708 4191",
             # Using same one-tap mobile and dial-in numbers as Barbara for now
             "one_tap_mobile": [
                 "+16469313860,,4960127137# US",
@@ -167,9 +166,9 @@ April Lowrie is inviting you to a scheduled Zoom meeting.
 Topic: April Lowrie's Personal Meeting Room
 
 Join Zoom Meeting
-[PLACEHOLDER - UPDATE WITH APRIL'S ZOOM URL]
+https://us02web.zoom.us/j/3707084191
 
-Meeting ID: [PLACEHOLDER - UPDATE WITH APRIL'S ZOOM ID]
+Meeting ID: 370 708 4191
 
 ---
 
@@ -198,7 +197,7 @@ Dial by your location
 • +1 253 205 0468 US
 • +1 253 215 8782 US (Tacoma)
 
-Meeting ID: [PLACEHOLDER - UPDATE WITH APRIL'S ZOOM ID]
+Meeting ID: 370 708 4191
 
 Find your local number: https://us02web.zoom.us/u/ksKzmwpEc""",
         },
