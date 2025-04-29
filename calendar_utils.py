@@ -95,7 +95,7 @@ def find_placeholder_events(query="Blind Invite"):
             .list(
                 calendarId=get_current_calendar_id(),
                 timeMin=now,
-                maxResults=10,
+                maxResults=50,
                 singleEvents=True,
                 orderBy="startTime",
                 q=query,
