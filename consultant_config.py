@@ -7,7 +7,6 @@ CONSULTANTS = {
     "barbara_pigg": {
         "basic_info": {
             "full_name": "Barbara Pigg",
-            "job_title": "CEO of Whiteboard Geeks",
             "email": "barbara.pigg@whiteboardgeeks.com",
             "crm_id_value": "Barbara Pigg",  # Value used in Close CRM filtering
             "first_name": "Barbara",
@@ -107,7 +106,6 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc""",
     "april_lowrie": {
         "basic_info": {
             "full_name": "April Lowrie",
-            "job_title": "Creative Director",
             "email": "april.lowrie@whiteboardgeeks.com",
             "crm_id_value": "user_wOfS9vCRRQt7nQAaij3dCSr38xadW6N7fTMjMbHF88n",
             "first_name": "April",
@@ -146,7 +144,7 @@ Find your local number: https://us02web.zoom.us/u/ksKzmwpEc""",
             "title": "Intro {{first_name}} {{last_initial}} @  {{company}} + April L @ Whiteboard Geeks",
             "description": """Hi {{first_name}},
 
-I'm the Creative Director of Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago we sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
+I'm the Director of Creative Partnerships at Whiteboard Geeks, we make whiteboard videos to simplify complex messages for all sorts of companies. Not terribly long ago we sent you a package with what we call a 'Video Card' or 'Video Brochure'. With the way the mail goes & hybrid work schedules, I wasn't sure if it arrived so I thought I'd invite you to a quick meeting.
 
 I'm hoping to share more about our process for telling your most important story, and explain how we've been able to drive great results for companies like Eli Lilly, Eisai Pharmaceuticals, Tyson Foods, Michelin Tires, IBM and Cleveland Clinic. 
 
