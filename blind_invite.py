@@ -770,7 +770,7 @@ def main():
         )
 
     selected_consultant_name = st.selectbox(
-        "Select Consultant :",
+        "Select Consultant:",
         options=display_options,
         index=index,
     )
