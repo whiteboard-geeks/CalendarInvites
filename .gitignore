@@ -6,4 +6,3 @@ __pycache__/
 token.json
 pseudocode.md
 *.json
-.envrc
