@@ -797,7 +797,15 @@ def main():
         st.session_state.template_description = current_consultant["templates"][
             "description"
         ]
+
+        st.session_state.tasks = []
+        st.session_state.search_attempted = False
+        st.session_state.time_looks_good = False
+        st.session_state.create_invites_clicked = False
+        st.toast(f"Switched to {current_consultant['basic_info']['full_name']}.")
+
         st.session_state.previous_consultant = st.session_state.selected_consultant
+        st.rerun()
 
     # Get the consultant configuration
     current_consultant = consultant_config.get_consultant(
