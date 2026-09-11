@@ -183,18 +183,18 @@ def check_lead_invite_exists(email):
 
         # Use the q parameter to search for events that might include the email
         # This searches across multiple fields including attendee's email
-        events_result = (
-            service.events()
-            .list(
-                calendarId=get_current_calendar_id(),
-                q=email,  # Search for the email in all fields
-                maxResults=100,  # Increase this if needed
-                singleEvents=True,
-            )
-            .execute()
-        )
-
-        events = events_result.get("items", [])
+        if service is None:
+            raise ValueError("Calendar unavailable; duplicate check blocked sending.")
+        events, page_token = [], None
+        while True:
+            events_result = service.events().list(
+                calendarId=get_current_calendar_id(), q=email,
+                maxResults=100, singleEvents=True, pageToken=page_token,
+            ).execute()
+            events.extend(events_result.get("items", []))
+            page_token = events_result.get("nextPageToken")
+            if not page_token:
+                break
 
         # Filter events to only include those where the email is in attendees
         matching_events = []
@@ -217,10 +217,8 @@ def check_lead_invite_exists(email):
         else:
             return False, "No invite found, safe to send"
 
-    except HttpError as error:
-        print(f"An error occurred while checking for existing invites: {error}")
-        # In case of error, allow the process to continue
-        return False, f"Error checking invites: {str(error)}"
+    except HttpError:
+        raise ValueError("Calendar duplicate lookup failed; sending is blocked.") from None
 
 
 def get_events_in_range(start_time, end_time):
@@ -232,22 +230,21 @@ def get_events_in_range(start_time, end_time):
         start_time = start_time.replace("-05:00Z", "-05:00").replace("Z", "")
         end_time = end_time.replace("-05:00Z", "-05:00").replace("Z", "")
 
-        events_result = (
-            service.events()
-            .list(
-                calendarId=get_current_calendar_id(),
-                timeMin=start_time,
-                timeMax=end_time,
-                singleEvents=True,
-                orderBy="startTime",
-            )
-            .execute()
-        )
-
-        return events_result.get("items", [])
-    except HttpError as error:
-        print(f"An error occurred: {error}")
-        return []
+        if service is None:
+            raise ValueError("Calendar unavailable; capacity lookup blocked sending.")
+        events, page_token = [], None
+        while True:
+            result = service.events().list(
+                calendarId=get_current_calendar_id(), timeMin=start_time,
+                timeMax=end_time, singleEvents=True, orderBy="startTime",
+                pageToken=page_token,
+            ).execute()
+            events.extend(result.get("items", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                return events
+    except HttpError:
+        raise ValueError("Calendar capacity lookup failed; sending is blocked.") from None
 
 
 if __name__ == "__main__":

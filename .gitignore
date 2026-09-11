@@ -6,3 +6,9 @@ __pycache__/
 token.json
 pseudocode.md
 *.json
+.pytest_cache/
+.venv*/
+.env
+.env.*
+.pi/
+*.mp4

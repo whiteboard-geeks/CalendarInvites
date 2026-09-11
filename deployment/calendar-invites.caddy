@@ -1,0 +1,18 @@
+# Import INSIDE the existing app.whiteboardgeeks.com site after parent validation.
+# No public webhooks exist in this polling slice; no webhook auth exemptions.
+redir /calendar-invites /calendar-invites/ permanent
+handle /calendar-invites/* {
+    forward_auth localhost:4180 {
+        uri /code-chat/oauth2/auth
+        copy_headers X-Auth-Request-Email X-Auth-Request-User
+        @denied status 401 403
+        handle_response @denied {
+            redir * /login?rd={http.request.orig_uri} 302
+        }
+    }
+    # Do NOT strip prefix: Streamlit server.baseUrlPath=calendar-invites.
+    reverse_proxy 127.0.0.1:8793
+}
+# The backend API is intentionally NOT published through Caddy. Streamlit reaches it
+# over the private Compose network (http://api:8000); operators use loopback 8792
+# via SSH. Bearer authentication is still enforced server-side on every data route.

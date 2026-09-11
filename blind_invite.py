@@ -4,6 +4,7 @@ import base64
 import calendar_utils
 import datetime
 import consultant_config  # Import the consultant configuration module
+import bridge_client
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -729,6 +730,28 @@ def process_placeholder_slots(
     }
 
 
+def advance_review_after_bridge(task_id, notice):
+    """A bridge operation owns this task now. Drop it from review, re-render the next lead's
+    templates (same clamp/recompute as the legacy path) and rerun so stale keyed inputs and an
+    out-of-range task index cannot reach the next lead."""
+    st.session_state.bridge_notice = notice
+    st.session_state.tasks = [t for t in st.session_state.tasks if t["id"] != task_id]
+    if st.session_state.tasks:
+        st.session_state.current_task_index = min(
+            st.session_state.current_task_index, len(st.session_state.tasks) - 1
+        )
+        next_task = st.session_state.tasks[st.session_state.current_task_index]
+        st.session_state.current_title = calendar_utils.format_template(
+            st.session_state.template_title, next_task
+        )
+        st.session_state.current_description = calendar_utils.format_template(
+            st.session_state.template_description, next_task
+        )
+    else:
+        st.session_state.review_mode = False
+    st.rerun()
+
+
 def main():
     st.set_page_config(page_title="Auto Calendar Invites")
 
@@ -811,6 +834,8 @@ def main():
     current_consultant = consultant_config.get_consultant(
         st.session_state.selected_consultant
     )
+
+    bridge_client.controls()
 
     # Default event description template from consultant config
     event_description_default = current_consultant["templates"]["description"]
@@ -1146,6 +1171,8 @@ def main():
                     st.rerun()
 
                 if st.session_state.review_mode:
+                    if st.session_state.get("bridge_notice"):
+                        st.info(st.session_state.pop("bridge_notice"))
                     task = st.session_state.tasks[st.session_state.current_task_index]
                     total_tasks = len(st.session_state.tasks)
 
@@ -1176,6 +1203,16 @@ def main():
                     # Send invite button at the top
                     if st.button("Send Invite", key="send_invite"):
                         try:
+                            if bridge_client.enabled():
+                                operation = bridge_client.operation_status(task["id"])
+                                if operation:
+                                    # Any existing operation is bridge-owned: it cannot be resent
+                                    # from review, so advance past it.
+                                    advance_review_after_bridge(
+                                        task["id"],
+                                        f"Bridge operation for {task['contact_email']}: {operation['state']}. No invitation was resent.",
+                                    )
+                                    return
                             # Check if lead already has an invite on the calendar
                             from calendar_utils import check_lead_invite_exists
 
@@ -1325,14 +1362,30 @@ def main():
                                         events_in_slot
                                         < st.session_state.leads_per_block
                                     ):
-                                        # Create the calendar invite
-                                        calendar_utils.create_calendar_invite(
+                                        if bridge_client.enabled():
+                                            result = bridge_client.submit(
+                                                task, slot_start.isoformat(), slot_end.isoformat(),
+                                                st.session_state.current_title,
+                                                st.session_state.current_description,
+                                                st.session_state.leads_per_block,
+                                            )
+                                            advance_review_after_bridge(
+                                                task["id"],
+                                                f"Bridge operation for {task['contact_email']}: {result['state']}. Close completes only after required events are confirmed.",
+                                            )
+                                            return
+
+                                        # Legacy path: never complete Close on failed creation.
+                                        created_event = calendar_utils.create_calendar_invite(
                                             task,
                                             slot_start.isoformat(),
                                             slot_end.isoformat(),
                                             title_template=st.session_state.current_title,
                                             description_template=st.session_state.current_description,
                                         )
+
+                                        if not created_event or not created_event.get("id"):
+                                            raise ValueError("Calendar creation was not confirmed; Close task was not completed.")
 
                                         slot_found = True
 

@@ -1,0 +1,94 @@
+name: calendar-invites
+x-backend: &backend
+  image: calendar-invites-backend:${RELEASE_TAG:-local}
+  build:
+    context: .
+    target: backend
+  env_file: ${CONFIG_DIR:-/etc/calendar-invites}/bridge.env
+  # Backend containers see only their own configuration files: no Streamlit secrets
+  # and no PostgreSQL superuser password.
+  volumes:
+    - ${CONFIG_DIR:-/etc/calendar-invites}/backend:/run/calendar-config:ro
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  networks: [database, egress]
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+services:
+  postgres:
+    image: postgres:16.9-bookworm
+    environment:
+      POSTGRES_DB: calendar_invites
+      POSTGRES_USER: calendar_invites
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    volumes:
+      - ${STATE_DIR:-/var/lib/calendar-invites}/postgres:/var/lib/postgresql/data
+      - ${CONFIG_DIR:-/etc/calendar-invites}/postgres_password:/run/secrets/postgres_password:ro
+    networks: [database]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U calendar_invites -d calendar_invites']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+  migrate:
+    <<: *backend
+    command: [python, -m, bridge.store]
+    restart: 'no'
+    profiles: [tools]
+  api:
+    <<: *backend
+    ports: ['127.0.0.1:${API_PORT:-8792}:8000']
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+  worker:
+    <<: *backend
+    command: [python, -m, bridge.worker]
+    healthcheck:
+      test: [CMD, python, -m, bridge.healthcheck]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  ui:
+    image: calendar-invites-ui:${RELEASE_TAG:-local}
+    build:
+      context: .
+      target: ui
+    environment:
+      CALENDAR_BRIDGE_UI_ENABLED: ${CALENDAR_BRIDGE_UI_ENABLED:-false}
+    volumes:
+      - ${CONFIG_DIR:-/etc/calendar-invites}/streamlit-secrets.toml:/home/calendar/.streamlit/secrets.toml:ro
+    ports: ['127.0.0.1:${UI_PORT:-8793}:8501']
+    networks: [egress]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/calendar-invites/_stcore/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  database:
+    internal: true
+  egress: {}

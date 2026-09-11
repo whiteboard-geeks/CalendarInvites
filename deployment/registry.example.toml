@@ -1,0 +1,69 @@
+# Server-controlled identities. EXAMPLE ONLY: all accounts remain UNAPPROVED.
+# Never infer ownership from names, email prefixes, or the shared Instantly workspace.
+[consultant]
+id = "barbara_pigg"
+main_sender = "barbara-main"
+location = "https://us02web.zoom.us/j/4960127137"
+placeholder_title = "Blind Invite"
+max_leads_per_block = 8
+
+[inventory]
+# Instantly status 1 is enough; campaign membership is not a send gate.
+# Account pause ALWAYS excludes.
+# Optional normalized JSON fixture for offline read-only UI, ONLY with BRIDGE_DRY_RUN=true:
+# fixture_file = "/run/calendar-config/inventory-fixture.json"
+
+[crm]
+activity_type = "actitype_0CmcjmRFeEsO3yJFnLLVpS"
+meeting_date_field = "cf_HiNTk2RNrqwaf0Uq4zgCOp6dB5v6IYy5KedqOaraZAB"
+sent_date_field = "cf_4Z6vPUo0xgW8CiECtoBSiMuA50RHsO0cVxFxsp9lq9u"
+# Optional EXISTING reviewed text custom field; do not create a Close field implicitly.
+# operation_field = "cf_reviewed_operation_marker"
+
+[[senders]]
+id = "barbara-main"
+email = "barbara.pigg@whiteboardgeeks.com"
+provider = "google"
+group = "main"
+owner = "barbara_pigg"
+subject = "barbara.pigg@whiteboardgeeks.com"
+calendar_id = "barbara.pigg@whiteboardgeeks.com"
+tenant = "REPLACE_WITH_VERIFIED_GOOGLE_WORKSPACE_ID"
+credential_secret = "GOOGLE_CALENDAR_CREDENTIAL"
+reviewed = false
+ready = false
+calendar_write_reviewed = false
+daily_cap = 0
+
+# Copy a block per explicitly reviewed outreach identity; these are NOT real accounts.
+[[senders]]
+id = "review-google-example"
+email = "unapproved@example.invalid"
+provider = "google"
+group = "google"
+owner = "unassigned"
+subject = "unapproved@example.invalid"
+calendar_id = "unapproved@example.invalid"
+tenant = "UNVERIFIED"
+credential_secret = "GOOGLE_OUTREACH_CREDENTIAL"  # authorized_user_map; see google-outreach-reauth.py
+reviewed = false
+ready = false
+calendar_write_reviewed = false
+approved_campaigns = []
+daily_cap = 0
+
+[[senders]]
+id = "review-microsoft-example"
+email = "unapproved-ms@example.invalid"
+provider = "microsoft"
+group = "microsoft"
+owner = "unassigned"
+subject = "UNVERIFIED_GRAPH_USER_ID"
+calendar_id = "UNVERIFIED_GRAPH_CALENDAR_ID"
+tenant = "UNVERIFIED_GRAPH_TENANT_ID"
+credential_secret = "GRAPH_CALENDAR_CREDENTIAL"
+reviewed = false
+ready = false
+calendar_write_reviewed = false
+approved_campaigns = []
+daily_cap = 0
