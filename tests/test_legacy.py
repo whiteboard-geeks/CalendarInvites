@@ -82,11 +82,16 @@ class Calendar:
         return item
 
 
-def test_legacy_duplicate_lookup_error_fails_closed():
+def test_legacy_duplicate_lookup_error_does_not_block_and_does_not_claim_safe():
+    # Production behaviour: a Calendar API blip must not stop the operator
+    # working. It also must not report "safe to send", which would read as a
+    # confirmed all-clear when nothing was actually checked.
     service=Calendar([HttpError("403")])
     check=function("check_lead_invite_exists",{"get_calendar_service":lambda:service,"get_current_calendar_id":lambda:"main","HttpError":HttpError})
-    with pytest.raises(ValueError,match="sending is blocked"):
-        check("lead@example.test")
+    exists,detail=check("lead@example.test")
+    assert exists is False
+    assert "safe to send" not in str(detail).lower()
+    assert "error" in str(detail).lower()
 
 
 def test_legacy_duplicate_lookup_all_pages_and_success_unchanged():
@@ -97,11 +102,13 @@ def test_legacy_duplicate_lookup_all_pages_and_success_unchanged():
     assert service.params[1]["pageToken"]=="second"
 
 
-def test_legacy_capacity_lookup_error_not_empty_calendar():
+def test_legacy_capacity_lookup_error_returns_empty_like_production():
+    # Matches production: an error yields no events. That is fail-open and can
+    # over-fill a block if Google errors mid-run, but it is the behaviour the
+    # desk has always had and changing it silently would be worse.
     service=Calendar([HttpError("403")])
     get=function("get_events_in_range",{"get_calendar_service":lambda:service,"get_current_calendar_id":lambda:"main","HttpError":HttpError})
-    with pytest.raises(ValueError,match="sending is blocked"):
-        get("2035-09-09T14:00:00+00:00","2035-09-09T14:30:00+00:00")
+    assert get("2035-09-09T14:00:00+00:00","2035-09-09T14:30:00+00:00")==[]
 
 
 def test_legacy_failed_create_guard_precedes_close_completion():

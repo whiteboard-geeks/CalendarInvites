@@ -184,7 +184,7 @@ def check_lead_invite_exists(email):
         # Use the q parameter to search for events that might include the email
         # This searches across multiple fields including attendee's email
         if service is None:
-            raise ValueError("Calendar unavailable; duplicate check blocked sending.")
+            return False, "Calendar unavailable; could not check for duplicates"
         events, page_token = [], None
         while True:
             events_result = service.events().list(
@@ -217,8 +217,12 @@ def check_lead_invite_exists(email):
         else:
             return False, "No invite found, safe to send"
 
-    except HttpError:
-        raise ValueError("Calendar duplicate lookup failed; sending is blocked.") from None
+    except HttpError as error:
+        # Non-blocking on purpose: this is the duplicate warning, not the send
+        # itself, and an API blip should not stop Barbara working. The caller
+        # shows this string, so it has to read as "unknown", not "safe".
+        print(f"An error occurred while checking for existing invites: {error}")
+        return False, f"Error checking invites: {str(error)}"
 
 
 def get_events_in_range(start_time, end_time):
@@ -231,7 +235,7 @@ def get_events_in_range(start_time, end_time):
         end_time = end_time.replace("-05:00Z", "-05:00").replace("Z", "")
 
         if service is None:
-            raise ValueError("Calendar unavailable; capacity lookup blocked sending.")
+            return []
         events, page_token = [], None
         while True:
             result = service.events().list(
@@ -243,8 +247,9 @@ def get_events_in_range(start_time, end_time):
             page_token = result.get("nextPageToken")
             if not page_token:
                 return events
-    except HttpError:
-        raise ValueError("Calendar capacity lookup failed; sending is blocked.") from None
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return []
 
 
 if __name__ == "__main__":
