@@ -70,8 +70,18 @@ def save_out(payload):
 
 
 def still_fresh(entry):
-    expires = entry.get("refresh_expires_at") or 0
-    return expires - time.time() > REAUTH_BEFORE and entry.get("refresh_token")
+    if not entry.get("refresh_token"):
+        return False
+    expires = entry.get("refresh_expires_at")
+    if not expires:
+        # Google returns refresh_token_expires_in only for app types that actually
+        # expire refresh tokens (External apps in Testing). This client is Internal
+        # to the Workspace org and returns no such field, so there is no expiry to
+        # track. Absent means "no known expiry", not "expired": inventing a lifetime
+        # here forced a full Playwright re-auth of every mailbox on a timer, for a
+        # deadline Google never set.
+        return True
+    return expires - time.time() > REAUTH_BEFORE
 
 
 def exchange(client, code):
@@ -114,8 +124,12 @@ def oauth_one(page, client, email, mailbox):
     tok = exchange(client, code)
     if not tok.get("refresh_token"):
         return None, "missing_refresh"
-    return {"refresh_token": tok["refresh_token"], "granted_at": int(time.time()),
-            "refresh_expires_at": int(time.time()) + int(tok.get("refresh_token_expires_in") or 7 * 86400)}, "granted"
+    entry = {"refresh_token": tok["refresh_token"], "granted_at": int(time.time())}
+    ttl = tok.get("refresh_token_expires_in")
+    if ttl:
+        # Only record an expiry Google actually stated.
+        entry["refresh_expires_at"] = int(time.time()) + int(ttl)
+    return entry, "granted"
 
 
 def main():
