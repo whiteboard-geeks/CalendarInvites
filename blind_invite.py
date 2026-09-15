@@ -835,7 +835,7 @@ def main():
         st.session_state.selected_consultant
     )
 
-    bridge_client.controls()
+    bridge_client.controls(current_consultant)
 
     # Default event description template from consultant config
     event_description_default = current_consultant["templates"]["description"]

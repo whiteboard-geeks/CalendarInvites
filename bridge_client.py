@@ -13,7 +13,11 @@ def enabled():
 
 def request(method, path, body=None):
     # Streamlit secrets are server-side; never render token/HTTP diagnostics.
-    config = st.secrets["calendar_bridge"]
+    try:
+        config = st.secrets["calendar_bridge"]
+    except (KeyError, FileNotFoundError):
+        # Flag on without bridge secrets must degrade, not crash the page.
+        raise ValueError("Bridge is not configured for this deployment.") from None
     try:
         response = requests.request(method, config["url"].rstrip("/") + path,
             headers={"Authorization": "Bearer " + config["operator_token"]}, json=body, timeout=(5, 30))
@@ -27,9 +31,26 @@ def request(method, path, body=None):
     return response.json()
 
 
-def controls():
+def controls(consultant=None):
+    """Bridge sender controls plus canary fixture tooling.
+
+    The fixture panel is rendered independently of the sender controls: those
+    return early when the bridge API is unreachable, and losing the ability to
+    create or clean up test data at exactly that moment is unhelpful.
+    """
     if not enabled():
         return
+    try:
+        _sender_controls()
+    except Exception:
+        # Never let sender-control failure remove the fixture tooling below.
+        st.error("Bridge sender controls unavailable.")
+    if consultant is not None:
+        import caltest_fixtures
+        caltest_fixtures.panel(consultant)
+
+
+def _sender_controls():
     st.subheader("Calendar senders")
     try:
         inventory = request("GET", "/inventory")
