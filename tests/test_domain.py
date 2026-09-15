@@ -61,6 +61,35 @@ def test_instantly_active_without_campaign_is_eligible(registry):
     assert not exclusion_reasons(account, time.time())
 
 
+@pytest.mark.parametrize("status,warmup,eligible", [
+    (1, 1, True),    # active and warming
+    (2, 1, True),    # paused for cold email, still a healthy warmed mailbox
+    (2, 0, True),    # paused with warmup also paused
+    (3, 1, False),   # temporary maintenance
+    (-1, 1, False),  # connection error
+    (-2, 1, False),  # soft bounce
+    (-3, 1, False),  # sending error
+    (1, -1, False),  # warmup banned/suspended
+    (2, -2, False),
+])
+def test_paused_is_usable_but_errors_and_bans_are_not(status, warmup, eligible, registry):
+    account = deepcopy(registry["senders"][1])
+    account["health"]["account_status"] = status
+    account["health"]["warmup_status"] = warmup
+    account["health"]["connected"] = status == 1
+    reasons = exclusion_reasons(account, time.time())
+    assert ("instantly_unusable" not in reasons) is eligible
+
+
+def test_missing_account_status_falls_back_to_connected(registry):
+    account = deepcopy(registry["senders"][1])
+    account["health"].pop("account_status", None)
+    account["health"]["connected"] = False
+    assert "instantly_unusable" in exclusion_reasons(account, time.time())
+    account["health"]["connected"] = True
+    assert "instantly_unusable" not in exclusion_reasons(account, time.time())
+
+
 def test_prefer_sender_pins_eligible_mailbox(registry):
     from bridge.domain import prefer_sender
     google = next(a for a in registry["senders"] if a["group"] == "google")

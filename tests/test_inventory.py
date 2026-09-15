@@ -44,10 +44,18 @@ def test_campaign_pause_not_account_pause_and_policy_explicit(monkeypatch,regist
     assert not paused_campaign["active_campaigns"]
     account["health"].update(paused_campaign)
     assert not exclusion_reasons(account,__import__('time').time())
+    # A paused ACCOUNT is paused for cold email. It stays usable for calendar
+    # invites: still warmed, authenticated and healthy. Only genuine error or
+    # maintenance states exclude.
     paused_account=Instantly(Scripted([{"status":2,"provider_code":2,"setup_pending":False},
         {"items":[]},Blocked("metrics_unavailable")]),{}).observe(account)
     account["health"].update(paused_account)
-    assert "instantly_not_connected" in exclusion_reasons(account,__import__('time').time())
+    assert not paused_account["connected"]
+    assert "instantly_unusable" not in exclusion_reasons(account,__import__('time').time())
+    broken_account=Instantly(Scripted([{"status":-1,"provider_code":2,"setup_pending":False},
+        {"items":[]},Blocked("metrics_unavailable")]),{}).observe(account)
+    account["health"].update(broken_account)
+    assert "instantly_unusable" in exclusion_reasons(account,__import__('time').time())
 
 
 def test_cursor_loop_fails_closed(monkeypatch):

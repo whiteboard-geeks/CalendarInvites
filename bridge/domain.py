@@ -89,6 +89,29 @@ def private_body(original, local_email, live=None):
     return body
 
 
+# Instantly account status: 1=active, 2=paused, 3=temporary maintenance,
+# negatives are connection/bounce/sending errors.
+#
+# A paused mailbox is paused for COLD EMAIL. It is still healthy, warmed and
+# authenticated, and hosting a calendar invite is not sending a campaign.
+# Requiring status 1 conflated the two, so deliberate cold-email pauses looked
+# like broken senders. Error states and maintenance still exclude, as does
+# warmup that is banned or suspended.
+INSTANTLY_CALENDAR_OK = (1, 2)
+
+
+def instantly_usable(health):
+    status = health.get("account_status")
+    if status is None:
+        # Health recorded before account_status existed: fall back to the old
+        # signal rather than silently widening eligibility on missing data.
+        return health.get("connected") is True
+    if status not in INSTANTLY_CALENDAR_OK:
+        return False
+    warmup = health.get("warmup_status")
+    return warmup is None or warmup >= 0
+
+
 def exclusion_reasons(account, now, freshness=900):
     reasons = []
     for key, reason in (("reviewed", "unreviewed"), ("ready", "readiness_unreviewed"),
@@ -109,8 +132,8 @@ def exclusion_reasons(account, now, freshness=900):
     if health.get("calendar_auth") is not True:
         reasons.append("calendar_auth_unhealthy")
     if account.get("group") != "main":
-        if health.get("connected") is not True:
-            reasons.append("instantly_not_connected")
+        if not instantly_usable(health):
+            reasons.append("instantly_unusable")
         if health.get("provider") != account.get("provider"):
             reasons.append("provider_unverified")
         # Instantly account status 1 is enough; a running campaign is not required.
