@@ -4,9 +4,12 @@ Creates the Close leads/tasks and the Barbara placeholder block that the S1-S11
 scenarios need, and removes them again, without leaving Streamlit.
 
 Safety rails, all of them deliberate:
-  * The panel only renders when bridge_client.enabled() is true, which requires
-    CALENDAR_BRIDGE_UI_ENABLED=true. That variable is unset on Streamlit Cloud,
-    so none of this is reachable from Barbara's normal app.
+  * This has its OWN flag, CALTEST_FIXTURES_ENABLED, deliberately separate from
+    CALENDAR_BRIDGE_UI_ENABLED. That one also routes live sending through the
+    bridge, so reusing it would mean test tooling could not exist in production
+    without changing how real invites are sent. These must stay independent.
+  * The panel is a collapsed expander: present for whoever needs it, not in the
+    way of anyone who does not.
   * Every lead name and task text carries the CALTEST_PREFIX marker, and cleanup
     refuses to touch anything without it.
   * Meetings are pinned to YEAR 2035. Cleanup only ever deletes calendar events
@@ -16,7 +19,7 @@ Safety rails, all of them deliberate:
 Guest addresses follow SCENARIOS.md: the app sends the mail AND the calendar
 invite to one address, so each scenario picks the address that proves its point.
 """
-import json
+import os
 import uuid
 from datetime import date, datetime, timezone
 
@@ -47,6 +50,27 @@ SCENARIOS = [
     ("CALTEST-S7-RSVP", "calendar_principal"),
     ("CALTEST-S8-EXISTING", "reuse_s1"),
 ]
+
+
+def enabled():
+    """Fixture tooling flag, independent of the bridge sending flag.
+
+    Reads an env var (wbg-apps, via compose) or a Streamlit secret (Community
+    Cloud, which has no env-var UI), so the same code works in both.
+    """
+    if os.getenv("CALTEST_FIXTURES_ENABLED", "false").strip().lower() == "true":
+        return True
+    try:
+        return str(st.secrets.get("CALTEST_FIXTURES_ENABLED", "")).strip().lower() == "true"
+    except Exception:
+        return False
+
+
+def render(consultant):
+    """Self-gated entry point, so callers never need to know the flag."""
+    if not enabled():
+        return
+    panel(consultant)
 
 
 def _close(method, path, body=None):
@@ -256,7 +280,11 @@ def panel(consultant):
     consultant_name = consultant["basic_info"]["full_name"]
     consultant_field = CONSULTANT_FIELD
     assignee_id = resolve_assignee(consultant["basic_info"].get("email"))
-    with st.expander("Multi-calendar test fixtures (2035 internal only)"):
+    with st.expander("Internal: multi-calendar test fixtures (2035)", expanded=False):
+        st.caption(
+            "Internal QA tooling. Not part of the invite workflow — if you are "
+            "sending invites to customers, you can ignore this section."
+        )
         st.caption(
             f"Creates {len(SCENARIOS)} canary leads/tasks for {consultant_name} plus the "
             f"{PLACEHOLDER_TITLE} block on {PLACEHOLDER_DAY}. Guests are internal "

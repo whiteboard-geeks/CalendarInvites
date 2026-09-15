@@ -31,23 +31,19 @@ def request(method, path, body=None):
     return response.json()
 
 
-def controls(consultant=None):
-    """Bridge sender controls plus canary fixture tooling.
+def controls():
+    """Bridge sender controls.
 
-    The fixture panel is rendered independently of the sender controls: those
-    return early when the bridge API is unreachable, and losing the ability to
-    create or clean up test data at exactly that moment is unhelpful.
+    Fixture tooling is rendered separately by caltest_fixtures, under its own
+    flag: this flag also switches live sending onto the bridge, so the two must
+    be independently switchable.
     """
     if not enabled():
         return
     try:
         _sender_controls()
     except Exception:
-        # Never let sender-control failure remove the fixture tooling below.
         st.error("Bridge sender controls unavailable.")
-    if consultant is not None:
-        import caltest_fixtures
-        caltest_fixtures.panel(consultant)
 
 
 def _sender_controls():

@@ -5,6 +5,7 @@ import calendar_utils
 import datetime
 import consultant_config  # Import the consultant configuration module
 import bridge_client
+import caltest_fixtures
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -835,7 +836,8 @@ def main():
         st.session_state.selected_consultant
     )
 
-    bridge_client.controls(current_consultant)
+    bridge_client.controls()
+    caltest_fixtures.render(current_consultant)
 
     # Default event description template from consultant config
     event_description_default = current_consultant["templates"]["description"]
