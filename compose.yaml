@@ -74,6 +74,8 @@ services:
       target: ui
     environment:
       CALENDAR_BRIDGE_UI_ENABLED: ${CALENDAR_BRIDGE_UI_ENABLED:-false}
+      # Canary fixture tooling, off unless explicitly enabled for this deployment.
+      CALTEST_FIXTURES_ENABLED: ${CALTEST_FIXTURES_ENABLED:-false}
     volumes:
       - ${CONFIG_DIR:-/etc/calendar-invites}/streamlit-secrets.toml:/home/calendar/.streamlit/secrets.toml:ro
     ports: ['127.0.0.1:${UI_PORT:-8793}:8501']
