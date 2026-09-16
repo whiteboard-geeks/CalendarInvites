@@ -57,8 +57,6 @@ class Settings:
         mains = [a["id"] for a in self.registry.get("senders", []) if a["group"] == "main"]
         if mains != [consultant["main_sender"]]:
             raise Blocked("one_google_main_sender_required")
-        if not 1 <= consultant.get("max_leads_per_block", 0) <= 100:
-            raise Blocked("invalid_server_slot_capacity")
         if not 10 <= self.poll_seconds <= 3600:
             raise Blocked("invalid_poll_interval")
 

@@ -70,3 +70,13 @@ def test_audited_disable_excludes_new_sends(client,store):
     assert "disabled_for_new_sends" in row["exclusions"]
     with store.connect() as c:
         assert c.execute("SELECT count(*) AS n FROM bridge_audit WHERE action='sender_disable'").fetchone()["n"]==1
+
+
+@pytest.mark.parametrize("value,status", [(1, 200), (8, 200), (40, 200), (100, 200), (0, 422), (101, 422)])
+def test_operator_chooses_leads_per_block_within_model_bounds(client, command, value, status):
+    # No server-side reviewed ceiling: the operator's value governs slot capacity and is
+    # bounded only by Invite.leads_per_block (1..100).
+    response = client.post("/invites", json=dict(command, task_id="task_cap%d" % value,
+                                                 leads_per_block=value), headers=auth())
+    assert response.status_code == status, response.text
+    assert "capacity_exceeds_reviewed_limit" not in response.text

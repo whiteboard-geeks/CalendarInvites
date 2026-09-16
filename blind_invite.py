@@ -962,6 +962,7 @@ def main():
             st.session_state.leads_per_block = st.number_input(
                 "Enter number of leads per block:",
                 min_value=1,
+                max_value=100,
                 value=st.session_state.leads_per_block,
                 key="leads_per_block_input",
             )

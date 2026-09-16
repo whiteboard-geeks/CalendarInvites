@@ -5,7 +5,8 @@ id = "barbara_pigg"
 main_sender = "barbara-main"
 location = "https://us02web.zoom.us/j/4960127137"
 placeholder_title = "Blind Invite"
-max_leads_per_block = 8
+# Leads per time block is chosen per-request by the operator in the UI (1..100).
+# Overbooking is prevented at reservation time by slot_at_capacity, not by a server limit.
 
 [inventory]
 # Instantly status 1 is enough; campaign membership is not a send gate.

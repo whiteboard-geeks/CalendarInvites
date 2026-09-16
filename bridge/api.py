@@ -157,8 +157,9 @@ def create_app(settings=None, store=None, providers=None, crm=None):
             raise Blocked("outreach_release_blocked_rsvp_concurrency")
         if instant(body.start) <= datetime.now(timezone.utc):
             raise Blocked("new_meeting_must_be_future")
-        if body.leads_per_block > s.consultant["max_leads_per_block"]:
-            raise Blocked("capacity_exceeds_reviewed_limit")
+        # Slot capacity is the caller's choice, bounded by Invite.leads_per_block (1..100).
+        # Overbooking is still prevented by slot_at_capacity, which counts live calendar
+        # events plus durable reservations under the consultant lock.
         main = s.sender(s.consultant["main_sender"])
         if body.email.lower() == main["email"].lower():
             raise Blocked("lead_cannot_be_barbara")
