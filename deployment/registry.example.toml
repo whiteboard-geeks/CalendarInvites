@@ -5,7 +5,7 @@ id = "barbara_pigg"
 main_sender = "barbara-main"
 location = "https://us02web.zoom.us/j/4960127137"
 placeholder_title = "Blind Invite"
-# Leads per time block is chosen per-request by the operator in the UI (1..100).
+# Leads per time block is chosen per-request by the operator in the UI; no server ceiling.
 # Overbooking is prevented at reservation time by slot_at_capacity, not by a server limit.
 
 [inventory]

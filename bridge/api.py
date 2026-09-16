@@ -33,7 +33,7 @@ class Invite(BaseModel):
     timezone: str = "UTC"
     title: str = Field(min_length=1, max_length=1000)
     description: str = Field(max_length=20000)
-    leads_per_block: int = Field(ge=1, le=100)
+    leads_per_block: int = Field(ge=1)
     allow_existing: bool = False
 
     @model_validator(mode="after")
@@ -157,9 +157,9 @@ def create_app(settings=None, store=None, providers=None, crm=None):
             raise Blocked("outreach_release_blocked_rsvp_concurrency")
         if instant(body.start) <= datetime.now(timezone.utc):
             raise Blocked("new_meeting_must_be_future")
-        # Slot capacity is the caller's choice, bounded by Invite.leads_per_block (1..100).
-        # Overbooking is still prevented by slot_at_capacity, which counts live calendar
-        # events plus durable reservations under the consultant lock.
+        # Slot capacity is the caller's choice, with no server-side ceiling. Overbooking is
+        # still prevented by slot_at_capacity, which counts live calendar events plus durable
+        # reservations under the consultant lock and refuses the reservation at the limit.
         main = s.sender(s.consultant["main_sender"])
         if body.email.lower() == main["email"].lower():
             raise Blocked("lead_cannot_be_barbara")
