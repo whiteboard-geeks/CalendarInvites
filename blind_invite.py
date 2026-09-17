@@ -1370,6 +1370,7 @@ def main():
                                                 st.session_state.current_title,
                                                 st.session_state.current_description,
                                                 st.session_state.leads_per_block,
+                                                placeholder_title=placeholder_event_name,
                                             )
                                             advance_review_after_bridge(
                                                 task["id"],

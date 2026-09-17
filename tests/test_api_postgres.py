@@ -81,3 +81,23 @@ def test_operator_sets_leads_per_block_without_upper_bound(client, command, valu
                                                  leads_per_block=value), headers=auth())
     assert response.status_code == status, response.text
     assert "capacity_exceeds_reviewed_limit" not in response.text
+
+
+def test_operator_placeholder_title_is_discounted_from_slot_capacity(settings, store, registry, command):
+    # The operator names the placeholder event on her own calendar; the bridge must discount
+    # the same event the UI does, otherwise the placeholder counts as a booked meeting and
+    # every slot reads one fuller than it is.
+    providers = FakeProviders(registry)
+    slot = [{"id": "ph", "summary": "x blind invites", "status": "confirmed", "attendees": []},
+            {"id": "real", "summary": "Intro Someone", "status": "confirmed", "attendees": []}]
+    providers.providers["main"].list = lambda **params: [] if params.get("q") else slot
+    with TestClient(create_app(settings, store, providers, FakeCRM())) as client:
+        accepted = client.post("/invites", json=dict(command, task_id="task_phnamed", groups=["main"],
+                                                     leads_per_block=2,
+                                                     placeholder_title="x blind invites"), headers=auth())
+        assert accepted.status_code == 200, accepted.text
+        # Omitted: the server falls back to its own title, so the placeholder is counted.
+        refused = client.post("/invites", json=dict(command, task_id="task_phdefault", groups=["main"],
+                                                    leads_per_block=2), headers=auth())
+        assert refused.status_code == 409
+        assert "slot_at_capacity" in refused.text

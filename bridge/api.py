@@ -34,6 +34,9 @@ class Invite(BaseModel):
     title: str = Field(min_length=1, max_length=1000)
     description: str = Field(max_length=20000)
     leads_per_block: int = Field(ge=1)
+    # The operator names the placeholder event; blank falls back to the registry default so a
+    # UI that predates this field keeps working.
+    placeholder_title: str | None = Field(default=None, min_length=1, max_length=1000)
     allow_existing: bool = False
 
     @model_validator(mode="after")
@@ -170,8 +173,9 @@ def create_app(settings=None, store=None, providers=None, crm=None):
                     if e.get("status") != "cancelled" and any(a.get("email", "").lower() == body.email.lower() for a in e.get("attendees", []))]
                 if existing_leads:
                     raise Blocked("existing_lead_invite_requires_review")
+            placeholder = body.placeholder_title or s.consultant["placeholder_title"]
             events = [e for e in api.list(timeMin=start, timeMax=end, singleEvents="true")
-                      if e.get("status") != "cancelled" and e.get("summary") != s.consultant["placeholder_title"]]
+                      if e.get("status") != "cancelled" and e.get("summary") != placeholder]
             return events, body.leads_per_block
         preferred = []
         try:

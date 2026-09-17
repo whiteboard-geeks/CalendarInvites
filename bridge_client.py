@@ -109,11 +109,17 @@ def operation_status(task_id):
     return request("GET", "/meetings/" + quote("barbara_pigg:" + task_id, safe=""))
 
 
-def submit(task, start, end, title, description, capacity, allow_existing=False):
+def submit(task, start, end, title, description, capacity, placeholder_title=None,
+           allow_existing=False):
     groups = st.session_state.get("bridge_groups", [])
     if not groups:
         raise ValueError("Select at least one sender group; no fallback sender.")
-    return request("POST", "/invites", {"task_id": task["id"], "lead_id": task["lead_id"],
+    body = {"task_id": task["id"], "lead_id": task["lead_id"],
         "email": task["contact_email"], "groups": groups, "start": start, "end": end,
         "timezone": "UTC", "title": title, "description": description, "leads_per_block": capacity,
-        "allow_existing": allow_existing})
+        "allow_existing": allow_existing}
+    # Send the operator's own placeholder name so the bridge discounts the same events the UI
+    # does; omitted rather than blank so the server falls back to its default.
+    if placeholder_title:
+        body["placeholder_title"] = placeholder_title
+    return request("POST", "/invites", body)
