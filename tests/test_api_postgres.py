@@ -101,3 +101,17 @@ def test_operator_placeholder_title_is_discounted_from_slot_capacity(settings, s
                                                     leads_per_block=2), headers=auth())
         assert refused.status_code == 409
         assert "slot_at_capacity" in refused.text
+
+
+def test_placeholder_title_ignores_surrounding_spaces(settings, store, registry, command):
+    # April's 2026-10-22 placeholder was titled ' Blind Invites' (leading space, invisible in
+    # Google Calendar). It must still be discounted, not counted as a booked meeting.
+    providers = FakeProviders(registry)
+    slot = [{"id": "ph", "summary": " Blind Invites", "status": "confirmed", "attendees": []},
+            {"id": "real", "summary": "Intro Someone", "status": "confirmed", "attendees": []}]
+    providers.providers["main"].list = lambda **params: [] if params.get("q") else slot
+    with TestClient(create_app(settings, store, providers, FakeCRM())) as client:
+        accepted = client.post("/invites", json=dict(command, task_id="task_phspace", groups=["main"],
+                                                     leads_per_block=2,
+                                                     placeholder_title="Blind Invites "), headers=auth())
+        assert accepted.status_code == 200, accepted.text

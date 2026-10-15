@@ -175,7 +175,8 @@ def create_app(settings=None, store=None, providers=None, crm=None):
                     raise Blocked("existing_lead_invite_requires_review")
             placeholder = body.placeholder_title or s.consultant["placeholder_title"]
             events = [e for e in api.list(timeMin=start, timeMax=end, singleEvents="true")
-                      if e.get("status") != "cancelled" and e.get("summary") != placeholder]
+                      if e.get("status") != "cancelled"
+                      and (e.get("summary") or "").strip() != placeholder.strip()]
             return events, body.leads_per_block
         preferred = []
         try:

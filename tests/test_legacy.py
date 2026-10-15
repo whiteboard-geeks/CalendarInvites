@@ -132,3 +132,22 @@ def test_barbara_only_feature_flag_off_and_april_unchanged(monkeypatch):
     assert bridge_client.enabled()
     fake.session_state["selected_consultant"]="april_lowrie"
     assert not bridge_client.enabled()
+
+
+def test_placeholder_title_ignores_surrounding_spaces():
+    # April's 2026-10-22 placeholder was titled ' Blind Invites' (leading space, invisible in
+    # Google Calendar); the exact-title filter dropped it and the UI said no slots were found.
+    g = {"st": FakeStreamlit(), "datetime": __import__("datetime")}
+    same_title = function("same_title", g, "blind_invite.py")
+    assert same_title(" Blind Invites", "Blind Invites")
+    assert same_title("Blind Invites  ", " Blind Invites")
+    assert not same_title("Blind Invites 2", "Blind Invites")
+    assert not same_title(None, "Blind Invites")
+    event = {"summary": " Blind Invites", "start": {"dateTime": "2026-10-22T12:30:00-04:00"},
+             "end": {"dateTime": "2026-10-22T13:00:00-04:00"}}
+    g["calendar_utils"] = types.SimpleNamespace(find_placeholder_events=lambda name: [event])
+    g["analyze_timezone_distribution"] = lambda tasks: (dict.fromkeys(["HI", "AK", "PT", "MT", "CT", "ET"], 0), 0)
+    process = function("process_placeholder_slots", g, "blind_invite.py")
+    # 30-minute block vs 60-minute meetings returns early, after the title filter has run.
+    result = process([], "Blind Invites", 60, 10)
+    assert result["placeholder_events"] == [event]

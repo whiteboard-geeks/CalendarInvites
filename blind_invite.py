@@ -17,6 +17,13 @@ import pytz
 
 
 # Configure retry decorator for Close API calls
+def same_title(summary, name):
+    """True when a calendar event title matches the placeholder name, ignoring spaces at
+    either end. Google Calendar hides a stray leading space, so ' Blind Invites' looks the
+    same as 'Blind Invites' to the person who typed it."""
+    return (summary or "").strip() == (name or "").strip()
+
+
 def is_rate_limit_error(response):
     """Check if response indicates a rate limit (HTTP 429)"""
     return response.status_code == 429
@@ -456,7 +463,7 @@ def process_placeholder_slots(
     placeholder_events = [
         event
         for event in placeholder_events
-        if event.get("summary") == placeholder_event_name
+        if same_title(event.get("summary"), placeholder_event_name)
     ]
 
     if not placeholder_events:
@@ -545,7 +552,7 @@ def process_placeholder_slots(
                 [
                     event
                     for event in existing_events
-                    if event["summary"] != placeholder_event_name
+                    if not same_title(event.get("summary"), placeholder_event_name)
                 ]
             )
 
@@ -1354,8 +1361,9 @@ def main():
                                         [
                                             event
                                             for event in existing_events
-                                            if event["summary"]
-                                            != placeholder_event_name
+                                            if not same_title(
+                                                event.get("summary"), placeholder_event_name
+                                            )
                                         ]
                                     )
 
