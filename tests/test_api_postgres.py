@@ -115,3 +115,18 @@ def test_placeholder_title_ignores_surrounding_spaces(settings, store, registry,
                                                      leads_per_block=2,
                                                      placeholder_title="Blind Invites "), headers=auth())
         assert accepted.status_code == 200, accepted.text
+
+
+def test_existing_lead_needs_review_unless_operator_allows_reinvite(settings, store, registry, command):
+    # Recycle campaigns deliberately re-invite leads Barbara invited before.
+    providers = FakeProviders(registry)
+    earlier = {"id": "old", "summary": "Intro Lead", "status": "confirmed",
+               "attendees": [{"email": command["email"]}]}
+    providers.providers["main"].list = lambda **params: [earlier] if params.get("q") else []
+    with TestClient(create_app(settings, store, providers, FakeCRM())) as client:
+        held = client.post("/invites", json=dict(command, task_id="task_old", groups=["main"]), headers=auth())
+        assert held.status_code == 409
+        assert "existing_lead_invite_requires_review" in held.text
+        again = client.post("/invites", json=dict(command, task_id="task_again", groups=["main"],
+                                                  allow_existing=True), headers=auth())
+        assert again.status_code == 200, again.text

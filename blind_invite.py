@@ -997,6 +997,15 @@ def main():
                 st.session_state.create_invites_clicked = False
                 st.session_state.prev_placeholder_name = placeholder_event_name
 
+            # Recycle campaigns re-invite leads who were invited before, so the
+            # "invite already exists" check would stop every one of them.
+            st.toggle(
+                "Re-invite leads who already have an invite (recycle campaigns)",
+                key="reinvite_existing",
+                help="On: skip the 'invite already exists' check and send anyway. "
+                "Off: leads Barbara has invited before are held for review.",
+            )
+
             if st.button("Find Placeholder Slots"):
                 # Reset invite state when finding new slots
                 st.session_state.invites_sent = False
@@ -1210,6 +1219,8 @@ def main():
                             st.write("**Timezone:** Unknown")
                         st.write(f"**Email:** {task['contact_email']}")
                     # Send invite button at the top
+                    if st.session_state.get("reinvite_existing"):
+                        st.caption("Re-invite is on: earlier invites to this lead are ignored.")
                     if st.button("Send Invite", key="send_invite"):
                         try:
                             if bridge_client.enabled():
@@ -1235,7 +1246,7 @@ def main():
                                 st.session_state[dialog_response_key] = None
 
                             # Only check for existing invites if we haven't shown the dialog yet
-                            if st.session_state[dialog_state_key] == "not_shown":
+                            if st.session_state[dialog_state_key] == "not_shown" and not st.session_state.get("reinvite_existing"):
                                 dupe_invites_exist, dupe_invites_details = (
                                     check_lead_invite_exists(task["contact_email"])
                                 )
@@ -1379,6 +1390,7 @@ def main():
                                                 st.session_state.current_description,
                                                 st.session_state.leads_per_block,
                                                 placeholder_title=placeholder_event_name,
+                                                allow_existing=bool(st.session_state.get("reinvite_existing")),
                                             )
                                             advance_review_after_bridge(
                                                 task["id"],
