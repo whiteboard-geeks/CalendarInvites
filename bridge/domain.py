@@ -67,7 +67,10 @@ def sync_action(old_o, old_b, organizer, barbara):
 IMPORT_FIELDS = frozenset("summary description location start end attendees organizer iCalUID "
     "reminders colorId extendedProperties visibility transparency recurrence recurringEventId "
     "originalStartTime sequence status attachments conferenceData source guestsCanInviteOthers "
-    "guestsCanSeeOtherGuests guestsCanModify endTimeUnspecified eventType".split())
+    "guestsCanSeeOtherGuests guestsCanModify endTimeUnspecified eventType eventLabelId".split())
+# eventLabelId (Google, Oct 2026) supersedes colorId. It is only written when the import
+# passes eventLabelVersion=1 (IMPORT_PARAMS); without it Barbara's label would be dropped.
+IMPORT_PARAMS = {"supportsAttachments": "true", "conferenceDataVersion": 1, "eventLabelVersion": 1}
 READ_ONLY_FIELDS = frozenset("kind etag id htmlLink created updated creator privateCopy locked "
     "hangoutLink attendeesOmitted anyoneCanAddSelf".split())
 

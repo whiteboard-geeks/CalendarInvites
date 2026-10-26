@@ -129,9 +129,10 @@ def test_full_private_representation_retains_live_local_fields():
     original["attendees"][0]["responseStatus"] = "accepted"
     live = dict(event(), summary="✅ Local title", description="Local notes", location="New room",
                 reminders={"useDefault": False, "overrides": [{"method": "popup", "minutes": 5}]},
-                colorId="4", extendedProperties={"private": {"automation": "keep"}}, privateCopy=True)
+                colorId="4", eventLabelId="label-4", extendedProperties={"private": {"automation": "keep"}}, privateCopy=True)
     body = private_body(original, "barbara@example.test", live)
-    for field in ("summary", "description", "location", "reminders", "colorId", "extendedProperties"):
+    for field in ("summary", "description", "location", "reminders", "colorId", "eventLabelId",
+                  "extendedProperties"):
         assert body[field] == live[field]
     assert body["organizer"] == original["organizer"]
     assert body["attendees"][-1] == {"email": "barbara@example.test", "responseStatus": "accepted"}

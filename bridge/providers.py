@@ -15,7 +15,7 @@ from google.auth.transport.requests import Request
 from google.oauth2 import service_account, credentials as oauth_credentials
 
 from .config import secret
-from .domain import Blocked, private_body
+from .domain import IMPORT_PARAMS, Blocked, private_body
 
 
 class ProviderError(Blocked):
@@ -160,7 +160,7 @@ class Google:
             self.assert_copy(existing, original, local_email)
             return existing
         result = self.http.call("POST", self.base + "/events/import", body=private_body(original, local_email),
-                                params={"supportsAttachments": "true", "conferenceDataVersion": 1})
+                                params=IMPORT_PARAMS)
         result = self.get(result["id"])
         self.assert_copy(result, original, local_email)
         return result
@@ -184,7 +184,7 @@ class Google:
             try:
                 result = self.http.call("POST", self.base + "/events/import",
                     body=private_body(original, local_email, live), headers=revision(live),
-                    params={"supportsAttachments": "true", "conferenceDataVersion": 1})
+                    params=IMPORT_PARAMS)
                 break
             except ProviderError as error:
                 if error.status != 412:
