@@ -239,3 +239,23 @@ Without TEST_DATABASE_URL the row-lock/worker/API integration tests explicitly s
 SQLite is not used or claimed as row-lock proof. HTTP is blocked by an autouse test
 fixture; provider adapters use scripted responses, never credentials/live recipients.
 Parent owns image builds on Hetzner, SSO/browser verification and controlled canaries.
+
+## Invitee "propose a new time" (added 2026-10-27)
+
+`bridge/proposals.py`. Every 10 minutes the worker looks for proposals on upcoming
+google/microsoft meetings: Microsoft via Graph `attendees[].proposedNewTime` (only for
+tentative/declined invitees), Google via IMAP on the sending Zapmail mailbox for
+`METHOD:COUNTER` .ics attachments (app passwords come from the Zapmail list API;
+`ZAPMAIL_API_KEY_FILE`). The Google Calendar API has no proposal field.
+
+A new proposal is imported onto Barbara's calendar as a private-copy event
+"🕒 New time proposed: <title>" at the proposed time, with her as the only guest:
+- **Yes** → the organizer event moves to that event's time (`sendUpdates=all`, the
+  invitee gets the normal update) and normal sync moves her own copy.
+- **No** → time unchanged; one reply goes out in the invitee's Instantly thread from
+  the same mailbox. A failed reply is recorded (`declined_reply_failed`), never resent.
+- **Another time** → open the event, change the time, Save, then Yes. Dragging a
+  private copy does not save (see the 2026-09-09 drag results).
+- Deleting it dismisses it. A newer proposal replaces it; cancellation removes it.
+State lives in meeting `data.proposal` / `proposals_done` / `proposals_seen`.
+Yes/No and Edit/Save were proven by API on her calendar; her native clicks were not.

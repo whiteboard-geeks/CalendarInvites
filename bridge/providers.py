@@ -146,6 +146,9 @@ class Google:
             result = self.get(stable_id)
         return result
 
+    def import_event(self, body):
+        return self.http.call("POST", self.base + "/events/import", body=body, params=IMPORT_PARAMS)
+
     def find_copy(self, uid):
         matches = list(self.list(iCalUID=uid, showDeleted="true"))
         if any(e.get("status") == "cancelled" for e in matches):
@@ -319,6 +322,18 @@ class Graph:
                    "start": graph_time(body["start"]), "end": graph_time(body["end"]),
                    "attendees": [{"emailAddress": {"address": a["email"]}, "type": "required"} for a in body["attendees"]]}
         return graph_event(self.http.call("POST", self.base, body=payload, headers=self.prefer))
+
+    def proposals(self, event_id):
+        # Outlook "propose new time" is only exposed by Graph, on the attendee.
+        raw = self.http.call("GET", self.base + "/" + quote(event_id, safe=""),
+                             params={"$select": "attendees"}, headers=self.prefer)
+        def utc(value):
+            dt = datetime.fromisoformat(value["dateTime"].replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo(iana_zone(value.get("timeZone", "UTC"))))
+            return dt.astimezone(timezone.utc).isoformat()
+        return [{"from": a["emailAddress"]["address"].lower(), "start": utc(p["start"]), "end": utc(p["end"])}
+                for a in raw.get("attendees", []) if (p := a.get("proposedNewTime"))]
 
     def patch_time(self, event, source):
         result = self.http.call("PATCH", self.base + "/" + quote(event["id"], safe=""),

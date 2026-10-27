@@ -9,6 +9,7 @@ from .crm import Close
 from .domain import Blocked, exclusion_reasons, rsvp_key, sync_action, time_key
 from .inventory import Inventory
 from .providers import Providers, ProviderError
+from . import proposals
 from .store import Store
 
 log = logging.getLogger("calendar_bridge")
@@ -20,9 +21,10 @@ POST_MEETING_GRACE_SECONDS = 86400
 
 
 class Worker:
-    def __init__(self, settings, store, providers, inventory, crm):
+    def __init__(self, settings, store, providers, inventory, crm, mailer=None):
         self.settings, self.store, self.providers = settings, store, providers
         self.inventory, self.crm = inventory, crm
+        self.mailer = mailer or proposals.Instantly(settings)
 
     def provider_pair(self, meeting):
         # Persisted compound identity remains authoritative after new-send retirement.
@@ -186,11 +188,17 @@ class Worker:
             if not locked:
                 raise Blocked("meeting_busy")
             meeting = self.store.get(operation)
+            if meeting["state"] == "cancelled":
+                proposals.advance(self, meeting)  # removes an unanswered proposal event
             if meeting["state"] in ("cancelled", "sync_conflict"):
-                return meeting
+                return self.store.get(operation)
             if not meeting["data"].get("linked"):
                 self.create(meeting)
                 meeting = self.store.get(operation)
+            # Barbara's answer to an invitee's proposed time; an accept moves the
+            # original first so the sync below carries it to her own copy.
+            proposals.advance(self, meeting)
+            meeting = self.store.get(operation)
             # Calendar repair/sync remains active during CRM outages/uncertainty.
             self.sync(meeting)
             meeting = self.store.get(operation)
@@ -235,7 +243,7 @@ def main():
     store.register(settings.registry)
     inventory = Inventory(settings, providers, store)
     worker = Worker(settings, store, providers, inventory, Close(settings))
-    next_inventory, next_discovery = 0, 0
+    next_inventory, next_discovery, next_proposals = 0, 0, 0
     while True:
         try:
             worked = worker.tick()
@@ -250,6 +258,13 @@ def main():
                     # Discovery is visibility only; a failure must not stall durable jobs.
                     reason = str(error) if isinstance(error, Blocked) else type(error).__name__
                     log.warning("inventory_discovery_failed reason=%s", reason)
+            if time.monotonic() >= next_proposals:
+                next_proposals = time.monotonic() + 600
+                try:
+                    proposals.scan(worker)
+                except Exception as error:
+                    reason = str(error) if isinstance(error, Blocked) else type(error).__name__
+                    log.warning("proposal_scan_failed reason=%s", reason)
             if not worked:
                 time.sleep(1)
         except Exception as error:
