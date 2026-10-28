@@ -2,6 +2,9 @@ FROM python:3.11.15-slim-bookworm AS backend
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements-bridge.txt ./
+# ca-certificates upgrade: eMudhra intermediate CA compromise (Oct 2026).
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements-bridge.txt \
     && useradd --uid 10001 --create-home --shell /usr/sbin/nologin calendar
 COPY bridge/ ./bridge/
@@ -12,6 +15,9 @@ FROM python:3.11.15-slim-bookworm AS ui
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.txt ./
+# ca-certificates upgrade: eMudhra intermediate CA compromise (Oct 2026).
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --uid 10001 --create-home --shell /usr/sbin/nologin calendar
 COPY blind_invite.py calendar_utils.py consultant_config.py bridge_client.py caltest_fixtures.py ./
