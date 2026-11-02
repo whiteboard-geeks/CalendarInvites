@@ -537,6 +537,9 @@ def process_placeholder_slots(
             )
             slot_end = slot_start + datetime.timedelta(minutes=meeting_length)
 
+            # Recheck at send time too: a saved preview can become too old.
+            if not calendar_utils.slot_has_notice(slot_start):
+                continue
             # Skip this slot if it extends beyond the event end time
             if slot_end > end_dt:
                 continue
@@ -1343,6 +1346,9 @@ def main():
                                         minutes=slot_index
                                         * st.session_state.meeting_length
                                     )
+
+                                    if not calendar_utils.slot_has_notice(slot_start):
+                                        continue
 
                                     # Check if this slot is valid for the lead's timezone
                                     if task.get("timezone"):

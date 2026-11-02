@@ -1,6 +1,7 @@
 import datetime
 import streamlit as st
 import consultant_config
+from invite_policy import earliest_invite_start
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -81,6 +82,12 @@ def get_calendar_service():
         return None
 
 
+def slot_has_notice(start):
+    if get_current_calendar_id() != "barbara.pigg@whiteboardgeeks.com":
+        return True
+    return start.tzinfo is not None and start >= earliest_invite_start()
+
+
 def find_placeholder_events(query="Blind Invite"):
     """Shows basic usage of the Google Calendar API.
     Prints the start and name of the next 10 events on the user's calendar.
@@ -120,6 +127,8 @@ def create_calendar_invite(
 ):
     """Creates a calendar invite for a given task."""
     try:
+        if not slot_has_notice(datetime.datetime.fromisoformat(start_time)):
+            raise ValueError("Barbara's invitations require three business days of notice")
         if not title_template or not description_template:
             raise ValueError(
                 "Both title_template and description_template are required"

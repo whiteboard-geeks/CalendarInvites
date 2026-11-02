@@ -156,3 +156,22 @@ def test_google_authorized_user_map_selects_mailbox(monkeypatch):
     assert seen == ["rb"]
     with pytest.raises(Blocked, match="provider_auth_unavailable"):
         google_token({"email": "missing@x.test", "credential_secret": "GOOGLE_OUTREACH_CREDENTIAL"})
+
+@pytest.mark.parametrize('provider', ['google', 'microsoft'])
+def test_notice_blocks_new_posts_not_existing_original_recovery(provider, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr('bridge.providers.earliest_invite_start',
+                        lambda: datetime(2036, 1, 1, tzinfo=timezone.utc))
+    if provider == 'google':
+        http = Scripted([ProviderError(404), event()])
+        api = google(http)
+    else:
+        recovered = dict(graph_raw(), singleValueExtendedProperties=[
+            {'id': GRAPH_OPERATION_PROPERTY, 'value': 'a'*64}])
+        http = Scripted([{'value': []}, {'value': [recovered]}])
+        api = Graph({'subject': 'sender@example.test', 'email': 'sender@example.test',
+                     'calendar_id': 'calendar'}, http)
+    with pytest.raises(Blocked, match='minimum_notice_3_business_days'):
+        api.create('a'*64, event())
+    assert api.create('a'*64, event())['id']
+    assert [c[0] for c in http.calls] == ['GET', 'GET']
