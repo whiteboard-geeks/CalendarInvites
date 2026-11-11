@@ -265,10 +265,10 @@ Offline marker regression check: `node tests/test_calendar_emoji.cjs`.
 
 Production release: `/opt/calendar-invites/release-20261102-notice` on `wbg-apps`.
 The release applies only this notice patch to the previous production source. It
-preserves production-only `bridge/proposals.py`, worker proposal integration,
-`Google.import_event`, `Graph.proposals`, pinned requirements and the certificate
-upgrade in Dockerfile; those preexisting changes are not fully represented by the
-repository baseline. Do not replace that release with a plain repository export.
+preserves `bridge/proposals.py`, worker proposal integration, `Google.import_event`,
+`Graph.proposals`, pinned requirements and the certificate upgrade in Dockerfile.
+Those were production-only until 2026-11-11, when `main` (proposals + certificate
+patch) was merged into this branch; the repository now matches production.
 The merged production source passed all 148 application tests against disposable
 PostgreSQL. API, worker and UI health checks passed after activation. No schema,
 sender routing, safe-mode settings or existing calendar invitations were changed.
@@ -283,3 +283,35 @@ The existing function name and trigger configuration were not changed. The scrip
 passed 20 offline cases. A read-only check found no accepted private copies in the
 next 21 days, so actual scheduled execution on an accepted live private copy was
 not verified. Do not resend a customer invitation to produce a test case.
+
+## Invitee "propose a new time" (added 2026-10-27)
+
+`bridge/proposals.py`. Every 10 minutes the worker looks for proposals on upcoming
+google/microsoft meetings: Microsoft via Graph `attendees[].proposedNewTime` (only for
+tentative/declined invitees), Google via IMAP on the sending Zapmail mailbox for
+`METHOD:COUNTER` .ics attachments (app passwords come from the Zapmail list API;
+`ZAPMAIL_API_KEY_FILE`). The Google Calendar API has no proposal field.
+
+A new proposal is imported onto Barbara's calendar as a private-copy event
+"🕒 New time proposed: <title>" at the proposed time, with her as the only guest:
+- **Yes** → the organizer event moves to that event's time (`sendUpdates=all`, the
+  invitee gets the normal update) and normal sync moves her own copy.
+- **No** → time unchanged; one reply goes out in the invitee's Instantly thread from
+  the same mailbox. A failed reply is recorded (`declined_reply_failed`), never resent.
+- **Another time** → open the event, change the time, Save, then Yes. Dragging a
+  private copy does not save (see the 2026-09-09 drag results).
+- Deleting it dismisses it. A newer proposal replaces it; cancellation removes it.
+State lives in meeting `data.proposal` / `proposals_done` / `proposals_seen`.
+Yes/No and Edit/Save were proven by API on her calendar; her native clicks were not.
+
+## Microsoft senders off (2026-11-11)
+
+All 104 Microsoft cold email senders are disabled for new sends through
+`POST /senders/{id}/disable` (stored in `bridge_senders.disabled`, survives restarts):
+0 of 443 Microsoft invites were accepted versus about 1% for Google and Barbara's
+calendar. The UI now greys out any sender group with no eligible senders.
+Release `/opt/calendar-invites/release-20261111-msoff` changes only `bridge_client.py`
+(UI image rebuilt; api/worker images retagged unchanged). Rollback: restore
+`/etc/calendar-invites/compose.env.pre-msoff`, point `current` at
+`release-20261102-notice`, `up -d --no-build ui`; re-enable senders with `disabled=false`.
+

@@ -81,6 +81,7 @@ class FakeProvider:
         self.create_timeout = self.copy_failure = False
         self.auth_error = None
         self.cas = True
+        self.proposed = []
 
     def auth_health(self):
         return True
@@ -93,7 +94,16 @@ class FakeProvider:
         return deepcopy(self.events[event_id])
 
     def list(self, **params):
-        return []
+        return [deepcopy(e) for e in self.events.values() if params.get("iCalUID") in (None, e.get("iCalUID"))]
+
+    def import_event(self, body):
+        self.writes.append("import")
+        id = "imported-" + str(len(self.events))
+        self.events[id] = dict(deepcopy(body), id=id, etag='"1"', privateCopy=True)
+        return self.get(id)
+
+    def proposals(self, event_id):
+        return deepcopy(self.proposed)
 
     def create(self, stable_id, body):
         if stable_id not in self.events:
