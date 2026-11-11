@@ -58,6 +58,11 @@ def _sender_controls():
     labels = {"main": "BP WBG Calendar", "google": "Instantly Google", "microsoft": "Instantly Microsoft"}
     for key, label in labels.items():
         count = inventory["groups"][key]
+        # A group with no eligible sender would fail every invite rotated to it.
+        if not count["eligible"]:
+            st.checkbox(f"{label} — off (0/{count['total']} eligible)", value=False, disabled=True,
+                        key="bridge_group_off_" + key)
+            continue
         if st.checkbox(f"{label} — {count['eligible']}/{count['total']} eligible", value=key == "main", key="bridge_group_" + key):
             selected.append(key)
     st.session_state.bridge_groups = selected
