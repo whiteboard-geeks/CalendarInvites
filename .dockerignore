@@ -4,6 +4,7 @@
 !requirements-bridge.txt
 !blind_invite.py
 !calendar_utils.py
+!invite_policy.py
 !consultant_config.py
 !bridge_client.py
 !caltest_fixtures.py

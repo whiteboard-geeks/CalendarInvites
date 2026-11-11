@@ -130,3 +130,16 @@ def test_existing_lead_needs_review_unless_operator_allows_reinvite(settings, st
         again = client.post("/invites", json=dict(command, task_id="task_again", groups=["main"],
                                                   allow_existing=True), headers=auth())
         assert again.status_code == 200, again.text
+
+def test_minimum_notice_new_reservation_and_idempotent_readback(client, command, monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr('bridge.api.earliest_invite_start',
+                        lambda: datetime(2034, 1, 1, tzinfo=timezone.utc))
+    first = client.post('/invites', json=command, headers=auth())
+    assert first.status_code == 200, first.text
+    monkeypatch.setattr('bridge.api.earliest_invite_start',
+                        lambda: datetime(2036, 1, 1, tzinfo=timezone.utc))
+    assert client.post('/invites', json=command, headers=auth()).json() == first.json()
+    refused = client.post('/invites', json=dict(command, task_id='task_shortnotice'), headers=auth())
+    assert refused.status_code == 409
+    assert 'minimum_notice_3_business_days' in refused.text

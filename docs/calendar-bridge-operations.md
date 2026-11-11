@@ -240,6 +240,50 @@ SQLite is not used or claimed as row-lock proof. HTTP is blocked by an autouse t
 fixture; provider adapters use scripted responses, never credentials/live recipients.
 Parent owns image builds on Hetzner, SSO/browser verification and controlled canaries.
 
+## Three-business-day notice and acceptance markers (2026-11)
+
+Barbara's new invitations require three weekdays of notice, keeping the same local
+clock time in America/Chicago (Friday afternoon → Wednesday afternoon). Saturdays
+and Sundays do not count; no holiday calendar is applied. Other consultants are
+unchanged. Preview and send-time slot selection use the same policy; the private
+operator API rejects short-notice new reservations. Google and Graph adapters
+recheck immediately before a new organizer POST, after recovery lookup, so queue
+retries cannot create short-notice invitations. Existing originals, copy-only
+repairs, reschedules and RSVP reconciliation are not resubmitted or moved.
+
+`deployment/markAcceptedMeetings_noNotify.gs` is the existing Apps Script trigger
+entry point with private-copy eligibility repaired. It allows external-organizer
+private copies only on the executing user's owned primary calendar. Synthetic
+self-attendance and organizer attendance never count as a customer acceptance.
+Existing rules remain: Intro + quarantine/comic-board body → 📦; other Intro → 📬;
+other accepted events → ✅. All leading markers are normalized, and removed when
+no other attendee is accepted. Writes change only the local summary with
+`sendUpdates=none`; original organizer identities and UIDs stay intact. All other
+Apps Script project files and existing triggers must remain unchanged on update.
+
+Offline marker regression check: `node tests/test_calendar_emoji.cjs`.
+
+Production release: `/opt/calendar-invites/release-20261102-notice` on `wbg-apps`.
+The release applies only this notice patch to the previous production source. It
+preserves `bridge/proposals.py`, worker proposal integration, `Google.import_event`,
+`Graph.proposals`, pinned requirements and the certificate upgrade in Dockerfile.
+Those were production-only until 2026-11-11, when `main` (proposals + certificate
+patch) was merged into this branch; the repository now matches production.
+The merged production source passed all 148 application tests against disposable
+PostgreSQL. API, worker and UI health checks passed after activation. No schema,
+sender routing, safe-mode settings or existing calendar invitations were changed.
+
+Rollback: restore `/etc/calendar-invites/compose.env.pre-notice`, point `current`
+back to `/opt/calendar-invites/release-20261028`, and run the previous release's
+`docker compose --env-file /etc/calendar-invites/compose.env up -d --no-build api worker ui`.
+
+Apps Script content was updated through the delegated API and read back: all nine
+project files were preserved, with only `markAcceptedMeetings_noNotify` changed.
+The existing function name and trigger configuration were not changed. The script
+passed 20 offline cases. A read-only check found no accepted private copies in the
+next 21 days, so actual scheduled execution on an accepted live private copy was
+not verified. Do not resend a customer invitation to produce a test case.
+
 ## Invitee "propose a new time" (added 2026-10-27)
 
 `bridge/proposals.py`. Every 10 minutes the worker looks for proposals on upcoming
@@ -259,3 +303,15 @@ A new proposal is imported onto Barbara's calendar as a private-copy event
 - Deleting it dismisses it. A newer proposal replaces it; cancellation removes it.
 State lives in meeting `data.proposal` / `proposals_done` / `proposals_seen`.
 Yes/No and Edit/Save were proven by API on her calendar; her native clicks were not.
+
+## Microsoft senders off (2026-11-11)
+
+All 104 Microsoft cold email senders are disabled for new sends through
+`POST /senders/{id}/disable` (stored in `bridge_senders.disabled`, survives restarts):
+0 of 443 Microsoft invites were accepted versus about 1% for Google and Barbara's
+calendar. The UI now greys out any sender group with no eligible senders.
+Release `/opt/calendar-invites/release-20261111-msoff` changes only `bridge_client.py`
+(UI image rebuilt; api/worker images retagged unchanged). Rollback: restore
+`/etc/calendar-invites/compose.env.pre-msoff`, point `current` at
+`release-20261102-notice`, `up -d --no-build ui`; re-enable senders with `disabled=false`.
+

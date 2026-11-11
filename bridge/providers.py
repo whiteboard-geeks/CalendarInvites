@@ -14,6 +14,8 @@ import requests
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account, credentials as oauth_credentials
 
+from invite_policy import earliest_invite_start
+
 from .config import secret
 from .domain import IMPORT_PARAMS, Blocked, private_body
 
@@ -138,6 +140,8 @@ class Google:
         except ProviderError as e:
             if e.status != 404:
                 raise
+        if datetime.fromisoformat(body["start"]["dateTime"].replace("Z", "+00:00")) < earliest_invite_start():
+            raise Blocked("minimum_notice_3_business_days")
         try:
             result = self.http.call("POST", self.base + "/events", body=dict(body, id=stable_id), params={"sendUpdates": "all"})
         except ProviderError as e:
@@ -314,6 +318,8 @@ class Graph:
                 or raw.get("organizer", {}).get("emailAddress", {}).get("address", "").lower() != self.account["email"].lower()):
                 raise Blocked("graph_recovery_identity_mismatch")
             return graph_event(raw)
+        if datetime.fromisoformat(body["start"]["dateTime"].replace("Z", "+00:00")) < earliest_invite_start():
+            raise Blocked("minimum_notice_3_business_days")
         payload = {"transactionId": transaction,
                    "singleValueExtendedProperties": [{"id": GRAPH_OPERATION_PROPERTY, "value": stable_id}],
                    "subject": body["summary"],

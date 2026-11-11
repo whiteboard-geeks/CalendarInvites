@@ -14,6 +14,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from invite_policy import earliest_invite_start
+
 from .config import Settings
 from .crm import Close
 from .domain import BARBARA, Blocked, exclusion_reasons, instant, time_key
@@ -158,8 +160,8 @@ def create_app(settings=None, store=None, providers=None, crm=None):
         s.allow_write()
         if set(body.groups) - {"main"} and not s.import_cas_verified:
             raise Blocked("outreach_release_blocked_rsvp_concurrency")
-        if instant(body.start) <= datetime.now(timezone.utc):
-            raise Blocked("new_meeting_must_be_future")
+        if instant(body.start) < earliest_invite_start():
+            raise Blocked("minimum_notice_3_business_days")
         # Slot capacity is the caller's choice, with no server-side ceiling. Overbooking is
         # still prevented by slot_at_capacity, which counts live calendar events plus durable
         # reservations under the consultant lock and refuses the reservation at the limit.
